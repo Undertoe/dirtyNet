@@ -2,3 +2,4 @@
 .clang-format
 .vscode
 build/
+build_test/
