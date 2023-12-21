@@ -13,4 +13,8 @@ TEST_CASE("IPV6 Construction")
         // correctly does not compile
         // dirtyNet::ipv6 ipv6{std::vector{123, 321, 123, 321}};
     }
+    {
+        dirtyNet::ipv6 valid("::1");
+        REQUIRE(valid.Valid());
+    }
 }
