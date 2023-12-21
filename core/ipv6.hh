@@ -26,7 +26,7 @@ public:
             return;
         }
 
-        size_t index{0};
+        size_t index{0}; 
         for(const auto & v : range)
         {
             _addr.__in6_u.__u6_addr32[index++] = v;
@@ -41,6 +41,8 @@ public:
     }
 
     bool Valid() const;
+    
+    in6_addr Address() const;
 
 private:
     in6_addr _addr{0};

@@ -1,9 +1,9 @@
 project(dirtyNet)
 
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.23)
 include(CTest)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 find_package(Catch2)
 
 if(Catch2_FOUND)
@@ -15,12 +15,10 @@ endif()
 set(LIB_NAME "dirtyNet")
 set(TEST_NAME ${LIB_NAME}_test)
 
-
 add_subdirectory(core)
 add_subdirectory(tests)
 
-
-add_custom_target(tests 
+add_custom_target(tests
     COMMAND ${CMAKE_MAKE_PROGRAM}
     COMMAND ${CMAKE_MAKE_PROGRAM} -C tests
     COMMAND ${CMAKE_MAKE_PROGRAM} test ARGS=-"-V"
