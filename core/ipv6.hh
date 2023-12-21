@@ -21,14 +21,14 @@ public:
     ipv6(const Range& range)
     {
         using T = std::ranges::range_value_t<Range>;
-        static_assert(std::same_as<T, uint32_t>, "ipv6 requires to use a range of uint32_t");
+        static_assert(std::same_as<T, uint32_t>, "ipv6 requires a range of uint32_t to use");
         if(range.size() != 4)
         {
             return;
         }
 
         size_t index{0};
-        for(auto & v : range)
+        for(const T & v : range)
         {
             _addr.__in6_u.__u6_addr32[index++] = v;
         }
