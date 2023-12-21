@@ -26,5 +26,4 @@ std::optional<IntType> to_int(std::string_view str)
 }
 
 
-
 }  // namespace Chapter2
