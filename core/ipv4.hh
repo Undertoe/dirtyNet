@@ -1,3 +1,4 @@
+#pragma once
 
 #include <stdint.h>
 #include <string>
@@ -17,6 +18,7 @@ public:
 
     bool Valid() const;
     in_addr Address() const;
+    std::string IP() const;
 
 
 private:
