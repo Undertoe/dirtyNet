@@ -24,3 +24,10 @@ dirtyNet::ipv4::Address() const
 {
     return _addr;
 }
+
+
+
+bool operator==(const in_addr& lhs, const in_addr& rhs)
+{
+    return lhs.s_addr == rhs.s_addr;
+}

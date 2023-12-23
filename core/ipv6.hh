@@ -51,3 +51,5 @@ private:
 
 };
 }
+
+bool operator==(const in6_addr& lhs, const in6_addr& rhs);

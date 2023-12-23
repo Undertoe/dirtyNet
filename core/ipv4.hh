@@ -27,4 +27,8 @@ private:
 
 };
 
+
 } // end namespace dirtyNet
+
+
+bool operator==(const in_addr& lhs, const in_addr& rhs);
