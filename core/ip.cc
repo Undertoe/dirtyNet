@@ -1,14 +1,23 @@
 #include "ip.hh"
 
+dirtyNet::ip::ip(ipv4&& ip) : _ip(ip) { }
 
+dirtyNet::ip::ip(ipv6&& ip) : _ip(ip) { }
 
-dirtyNet::ip::ip(ipv4&& ip) : _ip(ip)
+dirtyNet::ip::ip(in_addr addr) : _ip(addr.s_addr) { }
+
+dirtyNet::ip::ip(in6_addr addr) : _ip(addr) { }
+
+dirtyNet::ip::ip(const dirtyNet::ip::AddressType& ip) : _ip(in_addr(0u))
 {
-
-}
-
-dirtyNet::ip::ip(ipv6&& ip) : _ip(ip)
-{
+    if(const auto& v = std::get_if<in_addr>(&ip); v)
+    {
+        _ip = dirtyNet::ipv4(v->s_addr);
+    }
+    if(const auto & v = std::get_if<in6_addr>(&ip); v)
+    {
+        _ip = dirtyNet::ipv6(*v);
+    }
 
 }
 
@@ -57,4 +66,18 @@ dirtyNet::ip::Type() const
         return ip_type::ipv4;
     }
     return ip_type::ipv6;
+}
+
+std::string_view
+dirtyNet::ip::String() const
+{
+    if(const auto& v = std::get_if<ipv4>(&_ip); v)
+    {
+        return v->String();
+    }
+    else if(const auto & v  = std::get_if<ipv6>(&_ip); v)
+    {
+        return v->String();
+    }
+    return {};
 }

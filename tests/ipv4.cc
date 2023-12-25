@@ -18,4 +18,12 @@ TEST_CASE("IPV4 Construction")
         REQUIRE(ipv42.Valid());
         REQUIRE_FALSE(ipv4.Address() == ipv42.Address());
     }
+    {
+        dirtyNet::ipv4 str("192.168.0.1");
+        dirtyNet::ipv4 num(str.Address().s_addr);
+        REQUIRE(num.Valid());
+        REQUIRE(num.String() == str.String());
+        std::cout << "str.String()[" << str.String() << "]" << std::endl;
+        REQUIRE(str.String() == std::string_view("192.168.0.1"));
+    }
 }

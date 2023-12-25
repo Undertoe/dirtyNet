@@ -7,6 +7,7 @@
 #include <charconv>
 #include <iostream>
 #include <cstring>
+#include <ranges>
 
 namespace dirtyNet
 {
@@ -26,5 +27,15 @@ std::optional<IntType> to_int(std::string_view str)
     return std::nullopt;
 }
 
+template<typename Range>
+size_t find_end_char(const Range& r, char endChar)
+{
+    auto it = std::ranges::find(r, endChar);
+    if(it != std::ranges::end(r))
+    {
+        return static_cast<size_t>(std::ranges::distance(std::ranges::begin(r),it));
+    }
+    return std::ranges::size(r);
+}
 
 }  // namespace Chapter2

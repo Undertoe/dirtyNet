@@ -33,20 +33,19 @@ public:
             _addr.__in6_u.__u6_addr32[index++] = v;
         }
 
-        _valid = true;
+        _valid = inet_ntop(AF_INET6, &_addr, &_addrStr[0], INET6_ADDRSTRLEN);
     }
 
-    ipv6(std::string_view sv)
-    {
-        _valid = inet_pton(AF_INET6, std::string(sv).c_str(), &_addr) == 1;
-    }
+    ipv6(const in6_addr& addr);
+    ipv6(std::string_view sv);
 
     bool Valid() const;
     in6_addr Address() const;
-    std::string IP() const;
+    std::string_view String() const;
 
 private:
     in6_addr _addr{0};
+    std::array<char, INET6_ADDRSTRLEN> _addrStr{'\0'};
     bool _valid{false};
 
 };

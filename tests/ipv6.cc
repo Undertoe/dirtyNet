@@ -17,7 +17,7 @@ TEST_CASE("IPV6 Construction")
         dirtyNet::ipv6 valid("::1");
         REQUIRE(valid.Valid());
     }
-    {
+    {   // basic init
         dirtyNet::ipv6 one("::1");
         dirtyNet::ipv6 two(std::vector{0u, 0u, 0u, 0x1000000u});
         REQUIRE(one.Address() == two.Address());
@@ -25,5 +25,13 @@ TEST_CASE("IPV6 Construction")
         {
             std::cout << std::hex << one.Address().__in6_u.__u6_addr32[i] << std::endl;
         }
+    }
+    {   // testing string -> int init
+        dirtyNet::ipv6 str("::1");
+        REQUIRE(str.String() == "::1");
+        dirtyNet::ipv6 num(str.Address());
+        REQUIRE(num.Valid());
+        REQUIRE(num.String() == str.String());
+        REQUIRE(num.String() == "::1");
     }
 }

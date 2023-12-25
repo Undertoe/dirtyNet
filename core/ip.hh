@@ -14,8 +14,13 @@ enum class ip_type
 };
 class ip{
 public:
-    ip(ipv4&& ip);
-    ip(ipv6&& ip);
+    using AddressType = std::variant<in_addr,in6_addr>;
+
+    ip(ipv4&&);
+    ip(ipv6&&);
+    ip(in_addr);
+    ip(in6_addr);
+    ip(const AddressType&);
     ip(std::string_view);
 
     ip(const ip&) = delete;
@@ -25,8 +30,8 @@ public:
 
 
     bool Valid() const;
-    using AddressType = std::variant<in_addr,in6_addr>;
     std::variant<in_addr,in6_addr> Address() const;
+    std::string_view String() const;
 
     ip_type Type() const;
     
