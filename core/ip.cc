@@ -18,7 +18,6 @@ dirtyNet::ip::ip(const dirtyNet::ip::AddressType& ip) : _ip(in_addr(0u))
     {
         _ip = dirtyNet::ipv6(*v);
     }
-
 }
 
 dirtyNet::ip::ip(std::string_view ipString) : _ip(ipv4(ipString))
