@@ -20,6 +20,9 @@
 // 4) Reads should forward back & the user should implement how to handle passing this back.  Not sure if this is a good idea yet.
 // 5) What the fuck do we do about multicast?  Probably an implementation
 // 6) honestly this should probably have both lockless & blocking reads & writes.  Probably better to implement these in specializations.
+
+// need to probably start by pulling these basic implementations into a base level "connection" type.  We can then specialize "blockingUDP and LockFreeUDP".  Same with TCP.  
+// Can we template specialize those two attributes?
 namespace dirtyNet
 {
 
