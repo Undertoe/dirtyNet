@@ -19,10 +19,11 @@ dirtyNet::ipv4::ipv4(in_addr ip) : _addr(ip)
 dirtyNet::ipv4::ipv4(std::string_view ipString) 
 {
     _valid = (inet_pton(AF_INET, std::string(ipString).c_str(), &_addr) == 1);
-    for(int i = 0; i < ipString.length() && i < _addrStr.size(); i ++)
-    {
-        _addrStr[i] = ipString[i];
-    }
+    std::memcpy(&_addrStr.front(), &ipString[0], INET_ADDRSTRLEN);
+    // for(int i = 0; i < ipString.length() && i < _addrStr.size(); i ++)
+    // {
+    //     _addrStr[i] = ipString[i];
+    // }
 }
 
 

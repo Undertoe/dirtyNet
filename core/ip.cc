@@ -20,12 +20,16 @@ dirtyNet::ip::ip(const dirtyNet::ip::AddressType& ip) : _ip(in_addr(0u))
     }
 }
 
-dirtyNet::ip::ip(std::string_view ipString) : _ip(ipv4(ipString))
+dirtyNet::ip::ip(std::string_view ipString) : _ip(parse(ipString))
 {
-    if(ipString.find_first_of(":") != std::string_view::npos)
-    {
-        _ip = ipv6(ipString);
-    }
+    // if(ipString.find_first_of(":") != std::string_view::npos)
+    // {
+    //     _ip = ipv6(ipString);
+    // }
+    // else
+    // {
+    //     _ip = ipv4(ipString);
+    // }
 }
 
 
@@ -79,4 +83,17 @@ dirtyNet::ip::String() const
         return v->String();
     }
     return {};
+}
+
+std::variant<dirtyNet::ipv4, dirtyNet::ipv6> 
+dirtyNet::ip::parse(std::string_view ipString)
+{
+    if(ipString.find_first_of(":") != std::string_view::npos)
+    {
+        return dirtyNet::ipv6(ipString);
+    }
+    else
+    {
+        return dirtyNet::ipv4(ipString);
+    }
 }

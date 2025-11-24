@@ -10,11 +10,37 @@ include(FetchContent)
 FetchContent_Declare(
     catch2_v2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v2.13.10 # any 2.x tag is fine
+    GIT_TAG v2.13.10 
 )
 FetchContent_MakeAvailable(catch2_v2)
 get_target_property(_catch_inc Catch2::Catch2 INTERFACE_INCLUDE_DIRECTORIES)
 message(STATUS "Catch2 v2 single_include at: ${catch2_v2_SOURCE_DIR}/single_include")
+
+# FetchContent_Declare(
+#     googletest
+#     GIT_REPOSITORY https://github.com/google/googletest.git
+#     GIT_TAG v1.17.0 
+# )
+# FetchContent_MakeAvailable(googletest)
+
+# set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable Google Benchmark tests" FORCE)
+
+# FetchContent_Declare(
+#   googlebenchmark
+#   GIT_REPOSITORY https://github.com/google/benchmark.git
+#   GIT_TAG v1.9.4 
+# )
+# FetchContent_MakeAvailable(googlebenchmark)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(BENCHMARK REQUIRED benchmark)
+
+
+include(CheckIncludeFileCXX)
+check_include_file_cxx("benchmark/benchmark.h" HAVE_BENCHMARK_H)
+
+message(STATUS "Google Benchmark header found: ${HAVE_BENCHMARK_H}")
+
 
 # message(STATUS "Catch2 v2 include dirs: ${_catch_inc}")
 
@@ -29,7 +55,9 @@ message(STATUS "Catch2 v2 single_include at: ${catch2_v2_SOURCE_DIR}/single_incl
 # endif()
 set(LIB_NAME "dirtyNet")
 set(TEST_NAME ${LIB_NAME}_test)
+set(BENCH_NAME ${LIB_NAME}_bench)
 
+add_subdirectory(benchmarks)
 add_subdirectory(core)
 add_subdirectory(tests)
 

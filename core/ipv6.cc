@@ -4,10 +4,11 @@
 dirtyNet::ipv6::ipv6(std::string_view sv)
 {
     _valid = inet_pton(AF_INET6, std::string(sv).c_str(), &_addr) == 1;
-    for(int i = 0; i < sv.size() && i < _addrStr.size(); i ++)
-    {
-        _addrStr[i] = sv[i];
-    }
+    std::memcpy(&_addrStr.front(), &sv[0], INET6_ADDRSTRLEN);
+    // for(int i = 0; i < sv.size() && i < _addrStr.size(); i ++)
+    // {
+    //     _addrStr[i] = sv[i];
+    // }
 }
 
 dirtyNet::ipv6::ipv6(const in6_addr& addr)

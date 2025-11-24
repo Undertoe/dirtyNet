@@ -12,6 +12,8 @@ enum class ip_type
 {
     ipv4, ipv6
 };
+
+// This is a read only representation of an ip address, containing either ipv4 or ipv6
 class ip{
 public:
     using AddressType = std::variant<in_addr,in6_addr>;
@@ -23,6 +25,7 @@ public:
     ip(const AddressType&);
     ip(std::string_view);
 
+    // read only, cannot copy or delete this object
     ip(const ip&) = delete;
     ip& operator=(const ip&) = delete;
     ip(ip&&) = delete;
@@ -39,6 +42,8 @@ public:
 private:
 
     std::variant<ipv4, ipv6> _ip;
+
+    static std::variant<ipv4, ipv6> parse(std::string_view);
 
 
     struct AddressVisitor
