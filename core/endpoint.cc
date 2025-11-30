@@ -12,7 +12,7 @@ dirtyNet::endpoint dirtyNet::endpoint::parse_endpoint(std::string_view endpoint_
     std::string_view port_str = endpoint_str.substr(colon_pos + 1);
 
     if (ip_str == "localhost") {
-        ip_str = "::1";
+        ip_str = "127.0.0.1";
     }
 
     if (ip_str.front() == '[' && ip_str.back() == ']') {
@@ -31,20 +31,21 @@ dirtyNet::endpoint::endpoint(std::string_view ip_str, std::string_view port_str)
         throw std::invalid_argument("Invalid port number"); 
     }
     _port = port;
+    _netPort = htons(port);
 }
 
 dirtyNet::endpoint::endpoint(std::string_view ip_str, uint16_t port)
-    : _ip(ip_str), _port(port)
+    : _ip(ip_str), _port(port), _netPort(htons(port))
 {
 }
 
 dirtyNet::endpoint::endpoint(in_addr addr, uint16_t port)
-    : _ip(addr), _port(port)
+    : _ip(addr), _port(port), _netPort(htons(port))
 {
 }
 
 dirtyNet::endpoint::endpoint(in6_addr addr, uint16_t port)
-    : _ip(addr), _port(port)
+    : _ip(addr), _port(port), _netPort(htons(port))
 {
 }
 
@@ -54,8 +55,15 @@ dirtyNet::endpoint::Address() const
     return _ip.Address();
 }
 
+std::string_view
+dirtyNet::endpoint::IpString() const 
+{
+    return _ip.String();
+}
+
 uint16_t
 dirtyNet::endpoint::Port() const
 {
     return _port;
 }
+

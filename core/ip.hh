@@ -41,9 +41,12 @@ public:
 
 private:
 
-    std::variant<ipv4, ipv6> _ip;
+    std::variant<ipv4, ipv6> _ip{in_addr{0u}};
 
     static std::variant<ipv4, ipv6> parse(std::string_view);
+
+    static std::variant<ipv4, ipv6> init_from_addresstype(const dirtyNet::ip::AddressType& ip);
+    
 
 
     struct AddressVisitor
