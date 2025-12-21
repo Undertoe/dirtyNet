@@ -2,6 +2,8 @@
 
 #include <string_view>
 #include <charconv>
+#include <expected>
+#include <format>
 
 #include "ip.hh"
 
@@ -9,9 +11,18 @@
 
 namespace dirtyNet
 {
+
+    // enum class endpoint_error_e
+    // {
+    //     invalid_endpoint_format,
+    //     invalid_port_number_string,
+    // };
+
+    // std::string endpoint_error_string(dirtyNet::endpoint_error_e e);
+
     class endpoint{
     public:
-        static endpoint parse_endpoint(std::string_view);
+        static std::expected<endpoint, std::string> parse_endpoint(std::string_view);
 
         endpoint(std::string_view, std::string_view);
         endpoint(std::string_view, uint16_t);

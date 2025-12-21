@@ -1,11 +1,22 @@
 #include "endpoint.hh"
 
+// std::string endpoint_error_string(dirtyNet::endpoint_error_e e)
+// {
+//     using namespace dirtyNet;
+//     switch(e)
+//     {
+//         case endpoint_error_e::invalid_endpoint_format:
+//             return "Invalid Endpoint format.  Expected <ip>:<port> format (such as 192.168.0.1:8080)";
+//         case endpoint_error_e::invalid_port_number_string:
+//             return "Invalid number string caught";
+//     }
+// }
 
-dirtyNet::endpoint dirtyNet::endpoint::parse_endpoint(std::string_view endpoint_str)
+std::expected<dirtyNet::endpoint, std::string> dirtyNet::endpoint::parse_endpoint(std::string_view endpoint_str)
 {
     auto colon_pos = endpoint_str.find_last_of(':');
     if (colon_pos == std::string_view::npos) {
-        throw std::invalid_argument("Invalid endpoint format, expecting <ip>:<port> format");
+        return std::unexpected(std::format("invalid ip:port string caught {}.  expecting format <ip>:<port>", endpoint_str));
     }
 
     std::string_view ip_str = endpoint_str.substr(0, colon_pos);
@@ -18,8 +29,14 @@ dirtyNet::endpoint dirtyNet::endpoint::parse_endpoint(std::string_view endpoint_
     if (ip_str.front() == '[' && ip_str.back() == ']') {
         ip_str = ip_str.substr(1, ip_str.size() - 2);
     }
-
-    return dirtyNet::endpoint(ip_str, port_str);
+    try
+    {
+        return dirtyNet::endpoint(ip_str, port_str);
+    }
+    catch(const std::invalid_argument& e)
+    {  
+        return std::unexpected(std::format("Invalid port number port {}\n", port_str));
+    }
 }
 
 dirtyNet::endpoint::endpoint(std::string_view ip_str, std::string_view port_str)

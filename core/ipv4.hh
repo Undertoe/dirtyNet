@@ -1,14 +1,15 @@
 #pragma once
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <stdint.h>
+
+#include <algorithm>
+#include <array>
+#include <functional>
+#include <iostream>
 #include <string>
 #include <string_view>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <iostream>
-#include <array>
-#include <algorithm>
-#include <functional>
 
 #include "util.hh"
 
@@ -25,15 +26,12 @@ public:
     in_addr Address() const;
     std::string_view String() const;
 
-
 private:
     in_addr _addr{0};
-    std::array<char,INET_ADDRSTRLEN> _addrStr{'\0'}; 
-    bool _valid{false};
+    mutable std::array<char, INET_ADDRSTRLEN> _addrStr{'\0'};
+    mutable bool _validString{false};
 };
 
-
-} // end namespace dirtyNet
-
+}  // end namespace dirtyNet
 
 bool operator==(const in_addr& lhs, const in_addr& rhs);

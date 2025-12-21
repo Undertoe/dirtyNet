@@ -1,17 +1,19 @@
 #include <catch2/catch.hpp>
 
-#include <stacktrace>
-#include <iostream>
+// #include <stacktrace>
 #include <expected>
+#include <iostream>
 
 enum class testExpected
 {
-    one, two
+    one,
+    two
 };
 
-std::expected<std::string, testExpected> getTest(bool t)
+std::expected<std::string, testExpected>
+getTest(bool t)
 {
-    if(t)
+    if (t)
     {
         return "test";
     }
@@ -20,18 +22,18 @@ std::expected<std::string, testExpected> getTest(bool t)
 
 TEST_CASE("test")
 {
-    // auto tmp = std::stacktrace::current();
-    #ifdef _GLIBCXX_HAVE_STACKTRACE
+// auto tmp = std::stacktrace::current();
+#ifdef _GLIBCXX_HAVE_STACKTRACE
     std::cout << "stacktrace enabled" << std::endl;
-    #else
+#else
     std::cout << "no stacktrace enabled" << std::endl;
-    #endif
+#endif
 
-    #if __cplusplus > 202002L
+#if __cplusplus > 202002L
     std::cout << "Proper C++" << std::endl;
-    #else
+#else
     std::cout << "also improper C++" << std::endl;
-    #endif
+#endif
 
     auto t = getTest(true);
     auto f = getTest(false);

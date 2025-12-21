@@ -102,3 +102,4 @@ dirtyNet::ip::init_from_addresstype(const dirtyNet::ip::AddressType& ip)
     }
     return dirtyNet::ipv4{0u};
 }
+

@@ -21,8 +21,13 @@ build:
 test: build
 	cd build_test && ./tests/dirtyNet_test         # runs the test executable
 
-bench: build
-	cd build_test && ./benchmarks/dirtyNet_bench  # runs the benchmark executable
+bench: 
+	mkdir -p build_bench
+	cd build_bench && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS="-pg" && $(MAKE) && ./benchmarks/dirtyNet_bench  # runs the benchmark executable
+	cd ..
+
+bench_macos:
+	mkdir -p build_bench && cd build_bench && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS="-pg" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_PREFIX_PATH=/opt/homebrew && $(MAKE) && ./benchmarks/dirtyNet_bench
 
 build_13: 
 	mkdir build_test; cd build_test; cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=/usr/bin/gcc-13 -DCMAKE_CXX_COMPILER=/usr/bin/g++-13 -DLINK_LIBRARIES=-lstdc++_libbacktrace; make tests;

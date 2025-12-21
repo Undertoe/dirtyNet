@@ -26,8 +26,8 @@ public:
     ip(std::string_view);
 
     // read only, cannot copy or delete this object
-    ip(const ip&) = delete;
-    ip& operator=(const ip&) = delete;
+    ip(const ip&) = default;
+    ip& operator=(const ip&) = default;
     ip(ip&&) = delete;
     ip& operator=(ip&&) = delete;
 

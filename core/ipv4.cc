@@ -1,24 +1,21 @@
 #include "ipv4.hh"
 
-
-dirtyNet::ipv4::ipv4(uint32_t ipInt) 
+dirtyNet::ipv4::ipv4(uint32_t ipInt)
 {
     _addr.s_addr = ipInt;
     // std::cout << "[" << std::string_view(_addrStr.begin(), _addrStr.end()) << "]" << std::endl;
-    _valid = inet_ntop(AF_INET, &_addr, &_addrStr.front(), INET_ADDRSTRLEN);
+    // _validString = inet_ntop(AF_INET, &_addr, &_addrStr.front(), INET_ADDRSTRLEN);
     // std::cout << "[" << std::string_view(_addrStr.begin(), _addrStr.end()) << "]" << std::endl;
 }
 
 dirtyNet::ipv4::ipv4(in_addr ip) : _addr(ip)
 {
-    _valid = inet_ntop(AF_INET, &_addr, &_addrStr.front(), INET_ADDRSTRLEN);
-
+    // _valid = inet_ntop(AF_INET, &_addr, &_addrStr.front(), INET_ADDRSTRLEN);
 }
 
-
-dirtyNet::ipv4::ipv4(std::string_view ipString) 
+dirtyNet::ipv4::ipv4(std::string_view ipString)
 {
-    _valid = (inet_pton(AF_INET, std::string(ipString).c_str(), &_addr) == 1);
+    _validString = (inet_pton(AF_INET, std::string(ipString).c_str(), &_addr) == 1);
     std::memcpy(&_addrStr.front(), &ipString[0], INET_ADDRSTRLEN);
     // for(int i = 0; i < ipString.length() && i < _addrStr.size(); i ++)
     // {
@@ -26,11 +23,10 @@ dirtyNet::ipv4::ipv4(std::string_view ipString)
     // }
 }
 
-
 bool
 dirtyNet::ipv4::Valid() const
 {
-    return _valid;
+    return _validString;
 }
 
 in_addr
@@ -42,12 +38,15 @@ dirtyNet::ipv4::Address() const
 std::string_view
 dirtyNet::ipv4::String() const
 {
+    if (!_validString)
+    {
+        _validString = inet_ntop(AF_INET, &_addr, &_addrStr.front(), INET_ADDRSTRLEN);
+    }
     return std::string_view(_addrStr.data(), dirtyNet::find_end_char(_addrStr, '\0'));
 }
 
-
-
-bool operator==(const in_addr& lhs, const in_addr& rhs)
+bool
+operator==(const in_addr& lhs, const in_addr& rhs)
 {
     return lhs.s_addr == rhs.s_addr;
 }
