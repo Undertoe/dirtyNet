@@ -1,0 +1,28 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: /usr/local/bin/devcontainer-entrypoint
+    command: sleep infinity
+    privileged: true
+    user: vscode
+    working_dir: /workspace/dirtyNet
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AI_MEMORIES_DIR: /home/vscode/.ai-memories
+      CODEX_HOME: /home/vscode/.codex
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace/dirtyNet
+      - ${HOST_CODEX_HOME:-codex-home-fallback}:/host-codex:ro
+      - ${HOST_USER_HOME:-user-home-fallback}:/host-user-home:ro
+      - ${HOST_AI_MEMORIES_DIR:-ai-memories-fallback}:/home/vscode/.ai-memories
+
+volumes:
+  ai-memories-fallback:
+  codex-home-fallback:
+  user-home-fallback:

@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+set -eu
+
+mkdir -p /home/vscode/.codex /home/vscode/.codex/sessions /home/vscode/.codex/logs
+
+if [ -f /host-codex/auth.json ]; then
+    cp /host-codex/auth.json /home/vscode/.codex/auth.json
+fi
+
+if [ -f /host-codex/config.toml ]; then
+    cp /host-codex/config.toml /home/vscode/.codex/config.toml
+fi
+
+if [ -f /host-codex/AGENTS.md ]; then
+    cp /host-codex/AGENTS.md /home/vscode/.codex/AGENTS.md
+fi
+
+if [ -f /host-user-home/.AGENTS.md ]; then
+    cp /host-user-home/.AGENTS.md /home/vscode/AGENTS.md
+elif [ -f /host-user-home/AGENTS.md ]; then
+    cp /host-user-home/AGENTS.md /home/vscode/AGENTS.md
+elif [ ! -e /home/vscode/AGENTS.md ]; then
+    cat > /home/vscode/AGENTS.md <<'EOF'
+# Empty fallback AGENTS.md
+
+Set HOST_USER_HOME in .devcontainer/.env to import your host user AGENTS file.
+EOF
+fi
+
+exec "$@"
