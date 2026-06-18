@@ -1,5 +1,22 @@
-.clang-tidy
-.clang-format
-.vscode
+# Build output
 build/
-build_test/
+build-*/
+build_*/
+out/
+samples/
+errors/
+*.log
+.devcontainer/.env
+
+# CMake user/local files
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+cmake-build-*/
+
+# Editors and OS noise
+.cache/
+.vs/
+.vscode/
+.DS_Store
+Thumbs.db
