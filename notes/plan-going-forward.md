@@ -7,6 +7,17 @@
 - Decide the new active project layout before introducing fresh C++ source files.
 - Create a modern root build setup once the target layout is chosen.
 
+## Upcoming Tasks
+
+- Explore baseline Linux UDP and TCP socket interaction.
+- Add a baseline executable for UDP 1-to-1 ping/pong.
+- Add a baseline executable for TCP blocking echo server/client.
+- Add a baseline executable for a TCP framed protocol.
+- Add a baseline executable for UDP 1-to-many fanout with sequence numbers.
+- Add a baseline executable for a TCP one-thread-per-connection server.
+- Add a baseline executable for a TCP nonblocking epoll echo server.
+- Add a baseline executable for UDP request/response with timeout/retry.
+
 ## Rebuild Direction
 
 - Define the smallest useful dirtyNet core API before carrying over old implementation ideas.
