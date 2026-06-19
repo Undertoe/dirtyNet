@@ -3,6 +3,14 @@ set -eu
 
 mkdir -p /home/vscode/.codex /home/vscode/.codex/sessions /home/vscode/.codex/logs
 
+VSCODE_SERVER_SETTINGS_SOURCE=/workspace/dirtyNet/.devcontainer/vscode-server-settings.json
+VSCODE_SERVER_SETTINGS_TARGET=/home/vscode/.vscode-server/data/Machine/settings.json
+
+if [ -f "$VSCODE_SERVER_SETTINGS_SOURCE" ]; then
+    mkdir -p "$(dirname "$VSCODE_SERVER_SETTINGS_TARGET")"
+    cp "$VSCODE_SERVER_SETTINGS_SOURCE" "$VSCODE_SERVER_SETTINGS_TARGET"
+fi
+
 if [ -f /host-codex/auth.json ]; then
     cp /host-codex/auth.json /home/vscode/.codex/auth.json
 fi

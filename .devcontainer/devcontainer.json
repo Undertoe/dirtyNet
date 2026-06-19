@@ -21,6 +21,7 @@
           "strings": false
         },
         "editor.suggestOnTriggerCharacters": true,
+        "editor.wordWrap": "on",
         "cmake.configureOnOpen": true,
         "cmake.buildDirectory": "${workspaceFolder}/build",
         "C_Cpp.default.cppStandard": "c++23"

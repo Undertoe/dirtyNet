@@ -16,6 +16,8 @@ Goal: build understanding of raw Linux networking behavior before shaping dirtyN
 
 Primary reference: `notes/plan-going-forward.md`.
 
+Current UDP design notes: `notes/udp-pingpong-library-notes.md`.
+
 ## Ordered Task Queue
 
 1. Decide the baseline executable layout and naming convention.
@@ -32,3 +34,4 @@ Primary reference: `notes/plan-going-forward.md`.
 - Which baseline examples should live under `exec/`, `sandbox/`, or another intentionally chosen area?
 - Should each baseline be a single executable with modes, or separate client/server executables?
 - What behavior should be documented for each baseline before turning it into a reusable dirtyNet abstraction?
+- Which pieces of the UDP ping-pong boilerplate should become the first `endpoint` and `udp_socket` APIs?
