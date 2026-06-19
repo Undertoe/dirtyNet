@@ -21,6 +21,7 @@
 ## Rebuild Direction
 
 - Define the smallest useful dirtyNet core API before carrying over old implementation ideas.
+- Use the UDP ping-pong sandbox to identify concrete boilerplate that should move behind endpoint and socket abstractions.
 - Choose the active source layout, likely separating public headers, implementation, tests, benchmarks, and examples.
 - Establish the baseline C++ standard, compiler warnings, sanitizers, and formatting expectations.
 - Add dependency handling for Catch2 and Google Benchmark in a way that works inside the devcontainer and on host builds.
@@ -30,6 +31,8 @@
 ## Design Questions To Resolve
 
 - Which protocols are in scope first: UDP only, TCP only, or an abstraction that can grow into both?
+- What should the first address abstraction own: IPv4-only `sockaddr_in`, generic `sockaddr_storage`, or protocol-specific endpoint types?
+- Should `udp_socket` expose raw POSIX-shaped calls, higher-level datagram operations, or both?
 - Should protocol distinctions be compile-time types, runtime values, or a hybrid?
 - What ownership model should sockets and endpoints use?
 - Which async model should the project target first?

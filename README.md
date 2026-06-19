@@ -26,3 +26,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 Use `-DDIRTYNET_BUILD_PERF=OFF` to skip Google Benchmark targets.
+
+
+
+## AI Note: 
+As a note, no AI was used in the generation of our source code.  AI is priamrely used for boilerplate cmake generation, dev environment setup, and as a very handy rubber duck when stuck.  

@@ -1,10 +1,13 @@
-FROM ubuntu:latest
+FROM ubuntu:26.04
 
 ARG USERNAME=vscode
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
+RUN if [ -f /etc/dpkg/dpkg.cfg.d/excludes ]; then \
+        sed -i '\#^path-exclude=/usr/share/man/#d' /etc/dpkg/dpkg.cfg.d/excludes; \
+    fi \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         bubblewrap \
@@ -26,7 +29,11 @@ RUN apt-get update \
         lldb \
         linux-tools-common \
         linux-tools-generic \
+        less \
         make \
+        man-db \
+        manpages \
+        manpages-dev \
         ninja-build \
         nodejs \
         npm \
@@ -35,6 +42,13 @@ RUN apt-get update \
         time \
         valgrind \
         libbenchmark-dev \
+    && if dpkg-divert --list /usr/bin/man | grep -q '/usr/bin/man'; then \
+        if [ -e /usr/bin/man ] && [ -e /usr/bin/man.REAL ]; then \
+            rm -f /usr/bin/man; \
+        fi; \
+        dpkg-divert --rename --remove /usr/bin/man; \
+    fi \
+    && mandb -c \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g @openai/codex
