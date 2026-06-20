@@ -3,7 +3,7 @@ CMAKE ?= cmake
 BUILD_TYPE ?= Debug
 CMAKE_ARGS ?=
 
-.PHONY: help configure build test benchmark perf exec sandbox udp-ping all clean
+.PHONY: help configure build test benchmark perf exec sandbox udp-ping tcp-ping tpc-ping all clean
 
 help:
 	@echo "Targets:"
@@ -13,7 +13,9 @@ help:
 	@echo "  make benchmark  Build and run benchmarks"
 	@echo "  make exec       Build and run the basic exec sample"
 	@echo "  make sandbox    Build and run sandbox samples"
-	@echo "  make udp-ping   Build UDP ping-pong sandbox executables"
+	@echo "  make udp-ping   Build UDP ping sandbox executables"
+	@echo "  make tcp-ping   Build TCP ping sandbox executables"
+	@echo "  make tpc-ping   Alias for tcp-ping"
 	@echo "  make clean      Remove the build directory"
 
 configure:
@@ -38,8 +40,14 @@ sandbox: build
 	./$(BUILD_DIR)/sandbox/with_lib/sandbox_with_lib
 
 udp-ping: configure
-	$(CMAKE) --build $(BUILD_DIR) --target sandbox_udp_pingpong_server sandbox_udp_pingpong_client
-	./sandbox/udp_pingpong/run_pingpong.py --build-dir $(BUILD_DIR)
+	$(CMAKE) --build $(BUILD_DIR) --target sandbox_udp_ping_server sandbox_udp_ping_client
+	python3 ./sandbox/udp-ping/run.py --build-dir $(BUILD_DIR)
+
+tcp-ping: configure
+	$(CMAKE) --build $(BUILD_DIR) --target sandbox_tcp_ping_server sandbox_tcp_ping_client
+	python3 ./sandbox/tcp-ping/run.py --build-dir $(BUILD_DIR)
+
+tpc-ping: tcp-ping
 
 all: build test benchmark
 

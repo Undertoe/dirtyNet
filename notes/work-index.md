@@ -16,7 +16,7 @@ Goal: build understanding of raw Linux networking behavior before shaping dirtyN
 
 Primary reference: `notes/plan-going-forward.md`.
 
-Current UDP design notes: `notes/udp-pingpong-library-notes.md`.
+Current UDP learning notes: `notes/udp-pingpong-library-notes.md`.
 
 ## Ordered Task Queue
 
