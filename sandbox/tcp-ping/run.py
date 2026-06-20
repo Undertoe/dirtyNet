@@ -14,8 +14,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 
-SERVER_EXE = Path("sandbox/udp_pingpong/server/sandbox_udp_pingpong_server")
-CLIENT_EXE = Path("sandbox/udp_pingpong/client/sandbox_udp_pingpong_client")
+SERVER_EXE = Path("sandbox/tcp-ping/server/sandbox_tcp_ping_server")
+CLIENT_EXE = Path("sandbox/tcp-ping/client/sandbox_tcp_ping_client")
 
 
 def default_build_dir() -> Path:
@@ -32,7 +32,7 @@ def default_build_dir() -> Path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run the UDP ping-pong sandbox server and client."
+        description="Run the TCP ping sandbox server and client."
     )
     parser.add_argument(
         "--build-dir",
@@ -41,16 +41,10 @@ def parse_args() -> argparse.Namespace:
         help="CMake build directory. Defaults to BUILD_DIR, then _build, then build.",
     )
     parser.add_argument(
-        "--startup-delay",
+        "--check-delay",
         type=float,
-        default=0.2,
-        help="Seconds to wait after starting the server before running the client.",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=float,
-        default=10.0,
-        help="Seconds to wait for both processes to finish before stopping them.",
+        default=1.0,
+        help="Seconds to wait before checking that both processes have closed.",
     )
     return parser.parse_args()
 
@@ -76,20 +70,6 @@ def stop_process(process: subprocess.Popen[bytes]) -> int:
         return process.wait()
 
 
-def wait_for_processes(
-    processes: list[tuple[str, subprocess.Popen[bytes]]],
-    timeout: float,
-) -> bool:
-    deadline = time.monotonic() + timeout
-
-    while time.monotonic() < deadline:
-        if all(process.poll() is not None for _, process in processes):
-            return True
-        time.sleep(0.05)
-
-    return all(process.poll() is not None for _, process in processes)
-
-
 def main() -> int:
     args = parse_args()
     build_dir = args.build_dir.resolve()
@@ -99,26 +79,31 @@ def main() -> int:
         require_executable(build_dir, CLIENT_EXE)
     except (FileNotFoundError, PermissionError) as error:
         print(error, file=sys.stderr)
-        print("Build them first with: make udp-ping", file=sys.stderr)
+        print("Build them first with: make tcp-ping", file=sys.stderr)
         return 1
 
     processes: list[tuple[str, subprocess.Popen[bytes]]] = []
     try:
         server = subprocess.Popen([f"./{SERVER_EXE}"], cwd=build_dir)
         processes.append(("server", server))
-        time.sleep(args.startup_delay)
+
         client = subprocess.Popen([f"./{CLIENT_EXE}"], cwd=build_dir)
         processes.append(("client", client))
 
-        finished = wait_for_processes(processes, args.timeout)
-        if not finished:
-            for name, process in processes:
-                if process.poll() is None:
-                    print(
-                        f"{name} still running after {args.timeout:g}s; stopping.",
-                        file=sys.stderr,
-                    )
-                    stop_process(process)
+        time.sleep(args.check_delay)
+
+        still_running = [
+            (name, process)
+            for name, process in processes
+            if process.poll() is None
+        ]
+        if still_running:
+            for name, process in still_running:
+                print(
+                    f"{name} still running after {args.check_delay:g}s; stopping.",
+                    file=sys.stderr,
+                )
+                stop_process(process)
             return 124
     except KeyboardInterrupt:
         print("Interrupted; stopping child processes.", file=sys.stderr)
@@ -127,6 +112,7 @@ def main() -> int:
         return 130
 
     for _, process in processes:
+        process.wait()
         if process.returncode != 0:
             return process.returncode
     return 0
