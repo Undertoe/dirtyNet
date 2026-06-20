@@ -1,5 +1,5 @@
 add_executable(dirtynet_exec_basic
-    main.cpp
+    main.cc
 )
 
 target_link_libraries(dirtynet_exec_basic

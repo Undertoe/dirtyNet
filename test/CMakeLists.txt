@@ -1,7 +1,7 @@
 find_package(Catch2 3 CONFIG REQUIRED)
 
 add_executable(dirtynet_tests
-    dirtynet_test.cpp
+    dirtynet_test.cc
 )
 
 target_link_libraries(dirtynet_tests

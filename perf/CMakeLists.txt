@@ -1,7 +1,7 @@
 find_package(benchmark CONFIG REQUIRED)
 
 add_executable(dirtynet_perf
-    dirtynet_perf.cpp
+    dirtynet_perf.cc
 )
 
 target_link_libraries(dirtynet_perf

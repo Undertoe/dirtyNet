@@ -1,5 +1,5 @@
 add_executable(sandbox_udp_ping_server
-    main.cpp
+    main.cc
 )
 
 target_compile_features(sandbox_udp_ping_server
