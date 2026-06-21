@@ -1,6 +1,7 @@
 #pragma once
 
 #include <codecvt>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -9,7 +10,6 @@
 
 namespace tcp_packet
 {
-std::string hello_world();
 
 enum class type : uint32_t{
     ping, pong, greeting, invalid,
@@ -25,7 +25,9 @@ struct header{
     header() = default;
     header(const char*, size_t);
 
-    std::vector<uint8_t> encode() const;
+    bool encode(char*, size_t) const;
+
+    // std::vector<uint8_t> encode() const;
 };
 
 struct packet{
@@ -36,12 +38,14 @@ struct packet{
     packet() = delete;
     packet(type t);
     packet(const std::string& msg);
-    packet(const char*, size_t);
 
     std::string type_string() const;
 
+    bool encode(char*, size_t) const;
     std::vector<uint8_t> encode() const;
 };
+
+packet parse_packet(char*, size_t);
 
 packet create_ping();
 packet create_pong();

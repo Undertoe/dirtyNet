@@ -33,19 +33,20 @@ namespace tcp_packet
         _type = static_cast<type>(ntohl(tmp_type));
     }
 
-    std::vector<uint8_t> header::encode() const 
+    bool header::encode(char* ptr, size_t remaining_length) const
     {
-        if(_type == type::invalid)
+        // bounds check
+        if(remaining_length < sizeof(header))
         {
-            return {};
+            return false;
         }
-        std::vector<uint8_t> retval(sizeof(header), 0);
         auto type_network = htonl(static_cast<uint32_t>(_type));
         auto length = htonl(_datalen);
-        std::memcpy(&retval[0], &length, sizeof(length));
-        std::memcpy(&retval[sizeof(length)], &type_network, sizeof(type_network));
-        return retval;
+        std::memcpy(&ptr[0], &length, sizeof(length));
+        std::memcpy(&ptr[sizeof(length)], &type_network, sizeof(type_network));
+        return true;
     }
+
 
     packet::packet(tcp_packet::type t)
     {
@@ -56,23 +57,25 @@ namespace tcp_packet
         hdr._type = t;
     }
 
-    packet::packet(const std::string& str) :msg(str) 
+    packet::packet(const std::string& str) : msg(str) 
     {
         hdr._datalen = msg.size();
         hdr._type = type::greeting;
     }
 
-    packet::packet(const char* buffer, size_t length) : hdr(buffer, length)
+    bool packet::encode(char* buffer, size_t remainingLength) const
     {
-        if(hdr._type == type::invalid)
+        // checks if we do not have enough space remaining
+        if(remainingLength < sizeof(hdr) + hdr._datalen)
         {
-            validPacket = false;
-            return;
+            return false;
         }
 
-        if(hdr._datalen > 0)
+        hdr.encode(buffer, remainingLength);
+        buffer += sizeof(hdr);
+        if(hdr._type == type::greeting)
         {
-            msg = std::string(&buffer[(sizeof(hdr))], hdr._datalen);
+            std::memcpy(buffer, &msg[0], msg.length());
         }
     }
 

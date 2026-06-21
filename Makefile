@@ -37,8 +37,9 @@ exec: build
 	./$(BUILD_DIR)/exec/basic/dirtynet_exec_basic
 
 sandbox: build
-	./$(BUILD_DIR)/sandbox/hello_world/sandbox_hello_world
-	./$(BUILD_DIR)/sandbox/with_lib/sandbox_with_lib
+	python3 ./sandbox/udp-ping/run.py --build-dir $(BUILD_DIR)
+	python3 ./sandbox/tcp-ping/run.py --build-dir $(BUILD_DIR)
+	python3 ./sandbox/tcp-packet/run.py --build-dir $(BUILD_DIR)
 
 udp-ping: configure
 	$(CMAKE) --build $(BUILD_DIR) --target sandbox_udp_ping_server sandbox_udp_ping_client
