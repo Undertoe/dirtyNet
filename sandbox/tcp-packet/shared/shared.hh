@@ -15,6 +15,8 @@ enum class type : uint32_t{
     ping, pong, greeting, invalid,
 };
 
+std::string type_as_string(type);
+
 
 struct header{
     uint32_t _datalen{0};
@@ -35,6 +37,8 @@ struct packet{
     packet(type t);
     packet(const std::string& msg);
     packet(const char*, size_t);
+
+    std::string type_string() const;
 
     std::vector<uint8_t> encode() const;
 };

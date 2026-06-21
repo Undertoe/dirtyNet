@@ -4,6 +4,22 @@
 
 namespace tcp_packet
 {
+    std::string type_as_string(type t)
+    {
+        switch (t)
+        {
+            case type::greeting:
+                return "greeting";
+            case type::invalid:
+                return "invalid";
+            case type::ping:
+                return "ping";
+            case type::pong:
+                return "pong";
+        }
+        return "unknown type";
+    }
+
     header::header(const char* buffer, size_t count)
     {
         if(count < sizeof(header))
@@ -31,7 +47,7 @@ namespace tcp_packet
         return retval;
     }
 
-    packet::packet(type t)
+    packet::packet(tcp_packet::type t)
     {
         if(t == type::greeting)
         {
@@ -68,8 +84,17 @@ namespace tcp_packet
         }
         std::vector<uint8_t> retval(msg.length() + sizeof(hdr), 0);
         std::memcpy(&retval[0], hdr.encode().data(), sizeof(hdr));
-        std::memcpy(&retval[sizeof(hdr)], &msg[0], msg.length());
+        if(hdr._type == type::greeting)
+        {
+            std::memcpy(&retval[sizeof(hdr)], &msg[0], msg.length());
+        }
+
         return retval;
+    }
+
+    std::string tcp_packet::packet::type_string() const
+    {
+        return tcp_packet::type_as_string(hdr._type);
     }
 
     packet create_ping()

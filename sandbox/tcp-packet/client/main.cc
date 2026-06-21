@@ -1,5 +1,6 @@
 #include <netdb.h> 
 #include <netinet/in.h> 
+#include <ostream>
 #include <sys/socket.h> 
 #include <sys/types.h> 
 #include <unistd.h> // read(), write(), close()
@@ -45,22 +46,41 @@ int main()
 
     auto bitesWritten = write(sockfd, &encodedPacket[0], encodedPacket.size());
     std::cout << "CLIENT: Wrote " << bitesWritten << " bytes" << std::endl;
-    auto bitesRead = read(sockfd, buffer, sizeof(buffer) - 1);
+    auto bitesRead = read(sockfd, buffer, sizeof(buffer));
     // buffer[bitesRead] = '\0';
+    auto serverMsg = tcp_packet::packet(buffer, bitesRead);
     
-    std::cout << "CIENT: got message from server [" << serverMsg << "]" << std::endl;
+    std::cout << "CLIENT: recieved packet type from server: " << serverMsg.type_string() << std::endl;
 
-    
+    if(serverMsg.hdr._type != tcp_packet::type::pong)
+    {
+        std::cout << "INVALID PACKET BACK FOR TEST, EXITING" << std::endl;
+        return -1;
+    }
 
-    bitesWritten = write(sockfd, &msg2[0], msg2.size());
-    std::cout << "CLIENT: Wrote message [" << msg2 << "]" << std::endl; 
+    packet = tcp_packet::create_msg("Hello from client!");
+    encodedPacket = packet.encode();
+    bitesWritten = write(sockfd, &encodedPacket[0], encodedPacket.size());
     std::cout << "CLIENT: Wrote " << bitesWritten << " bytes" << std::endl;
 
+    
     bzero(buffer, sizeof(buffer));
-    bitesRead = read(sockfd, buffer, sizeof(buffer) - 1);
-    buffer[bitesRead] = '\0';
-    serverMsg = std::string(buffer);
-    std::cout << "CIENT: got message from server [" << serverMsg << "]" << std::endl;
+    bitesRead = read(sockfd, buffer, sizeof(buffer));
+    serverMsg = tcp_packet::packet(buffer, bitesRead);
+    if(serverMsg.hdr._type != tcp_packet::type::greeting)
+    {
+        std::cout << "CLIENT: EXPECTED GREETING, EXITING" << std::endl;
+        return -1;
+    }
+    std::cout << "CLIENT: Recieved message from server: " << serverMsg.msg << std::endl;
+
+
+    std::cout << "Client writing quit to server" << std::endl;
+    packet = tcp_packet::create_msg("QUIT");
+    encodedPacket = packet.encode();
+    bitesWritten = write(sockfd, &encodedPacket[0], encodedPacket.size());
+    std::cout << "CLIENT: Wrote " << bitesWritten << " bytes" << std::endl;
+
 
     std::cout << "CLIENT: Exiting" << std::endl;
     close(sockfd);
