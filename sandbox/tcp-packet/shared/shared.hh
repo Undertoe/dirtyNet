@@ -6,6 +6,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <optional>
 #include <stdint.h>
 
 namespace tcp_packet
@@ -19,7 +20,6 @@ std::string type_as_string(type);
 
 
 struct header{
-    uint32_t _datalen{0};
     type _type{type::invalid};
 
     header() = default;
@@ -32,20 +32,21 @@ struct header{
 
 struct packet{
     header hdr; // NOT INCLUDING THE HEADER LENGTH
+    uint32_t datalen{0};
     std::string msg;
     bool validPacket{true};
 
     packet() = delete;
     packet(type t);
+    packet(char* , size_t );
     packet(const std::string& msg);
 
     std::string type_string() const;
 
     bool encode(char*, size_t) const;
-    std::vector<uint8_t> encode() const;
 };
 
-packet parse_packet(char*, size_t);
+std::optional<packet> parse_packet(char*, size_t);
 
 packet create_ping();
 packet create_pong();
