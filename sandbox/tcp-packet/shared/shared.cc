@@ -2,9 +2,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <arpa/inet.h>
+#include <cstring>
 #include <netinet/in.h>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace tcp_packet
 {
@@ -24,18 +26,6 @@ namespace tcp_packet
         return "unknown type";
     }
 
-    bool header::encode(char* ptr, size_t remaining_length) const
-    {
-        // bounds check
-        if(remaining_length < sizeof(_type))
-        {
-            return false;
-        }
-        auto type_network = htonl(static_cast<uint32_t>(_type));
-        std::memcpy(&ptr[0], &type_network, sizeof(type_network));
-        return true;
-    }
-
 
     packet::packet(tcp_packet::type t)
     {
@@ -43,44 +33,45 @@ namespace tcp_packet
         {
             validPacket = false;
         }
-        hdr._type = t;
+        hdr = t;
     }
 
 
     packet::packet(const std::string& str) : msg(str) 
     {
         datalen = msg.size();
-        hdr._type = type::greeting;
+        hdr = type::greeting;
     }
 
-    bool packet::encode(char* buffer, size_t remainingLength) const
+    std::vector<char> packet::encode() const
     {
-        // checks if we do not have enough space remaining
-        if(remainingLength < sizeof(hdr) + datalen)
+        constexpr size_t hdrLength = sizeof(hdr);
+        constexpr size_t datalenLen = sizeof(datalen);
+        if(!validPacket)
         {
-            return false;
+            return {};
         }
-
-        hdr.encode(buffer, remainingLength);
-        buffer += sizeof(hdr);
-        if(hdr._type == type::greeting)
+        std::vector<char> outBuffer(hdrLength + datalenLen + datalen, 0);
+        auto networkHdr = ntohl(static_cast<uint32_t>(hdr));
+        std::memcpy(outBuffer.data(), &networkHdr, hdrLength);
+        if(hdr == type::greeting)
         {
-            auto tmpLength = ntohl(datalen);
-            std::memcpy(buffer, &tmpLength, sizeof(tmpLength));
-            buffer += sizeof(tmpLength);
-            std::memcpy(buffer, &msg[0], msg.length());
+            auto networkDatalen = ntohl(datalen);
+            std::memcpy(outBuffer.data() + hdrLength, &networkDatalen, datalenLen);
+            std::memcpy(outBuffer.data() + hdrLength + datalenLen, msg.data(), msg.length());
         }
-        return true;
+        return outBuffer;
     }
+
 
     // we need to change all parsing to use std::span
-    parse_result tcp_packet::parse_packet(std::span<char> buffer)
+    parse_result parse_packet(std::span<char> buffer)
     {
-        constexpr size_t headerSize = sizeof(header::_type);
+        constexpr size_t headerSize = sizeof(type);
         constexpr size_t lengthSize = sizeof(packet::datalen);
         if(buffer.size() < headerSize)
         {
-            return {parse_status::invalid, std::nullopt, 0};
+            return {parse_status::incomplete, std::nullopt, 0};
         }
 
         // grab the type 
@@ -127,7 +118,7 @@ namespace tcp_packet
 
     std::string tcp_packet::packet::type_string() const
     {
-        return tcp_packet::type_as_string(hdr._type);
+        return tcp_packet::type_as_string(hdr);
     }
 
     packet create_ping()

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <string>
 #include <span>
+#include <vector>
 #include <optional>
 #include <stdint.h>
 
@@ -18,22 +19,13 @@ enum class type : uint32_t{
 
 std::string type_as_string(type);
 
-
-struct header{
-    type _type{type::invalid};
-
-    bool encode(char*, size_t) const;
-
-    // std::vector<uint8_t> encode() const;
-};
-
 struct packet{
-    header hdr; // NOT INCLUDING THE HEADER LENGTH
+    type hdr{type::invalid};
     uint32_t datalen{0};
     std::string msg;
     bool validPacket{true};
 
-    packet() = delete;
+    packet() = default;
     packet(const packet&) = default;
     packet& operator=(const packet&) = default;
     packet(packet&&) = default;
@@ -43,8 +35,9 @@ struct packet{
 
     std::string type_string() const;
 
-    bool encode(char*, size_t) const;
+    std::vector<char> encode() const;
 };
+
 
 enum class parse_status{
     complete, incomplete, invalid,

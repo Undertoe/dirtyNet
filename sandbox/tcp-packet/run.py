@@ -46,6 +46,12 @@ def parse_args() -> argparse.Namespace:
         default=1.0,
         help="Seconds to wait before checking that both processes have closed.",
     )
+    parser.add_argument(
+        "--startup-delay",
+        type=float,
+        default=0.05,
+        help="Seconds to wait after starting the server before starting the client.",
+    )
     return parser.parse_args()
 
 
@@ -86,6 +92,8 @@ def main() -> int:
     try:
         server = subprocess.Popen([f"./{SERVER_EXE}"], cwd=build_dir)
         processes.append(("server", server))
+
+        time.sleep(args.startup_delay)
 
         client = subprocess.Popen([f"./{CLIENT_EXE}"], cwd=build_dir)
         processes.append(("client", client))
