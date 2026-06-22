@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
-#include <vector>
+#include <span>
 #include <optional>
 #include <stdint.h>
 
@@ -22,9 +22,6 @@ std::string type_as_string(type);
 struct header{
     type _type{type::invalid};
 
-    header() = default;
-    header(const char*, size_t);
-
     bool encode(char*, size_t) const;
 
     // std::vector<uint8_t> encode() const;
@@ -37,8 +34,11 @@ struct packet{
     bool validPacket{true};
 
     packet() = delete;
+    packet(const packet&) = default;
+    packet& operator=(const packet&) = default;
+    packet(packet&&) = default;
+    packet& operator=(packet&&) = default;
     packet(type t);
-    packet(char* , size_t );
     packet(const std::string& msg);
 
     std::string type_string() const;
@@ -46,7 +46,17 @@ struct packet{
     bool encode(char*, size_t) const;
 };
 
-std::optional<packet> parse_packet(char*, size_t);
+enum class parse_status{
+    complete, incomplete, invalid,
+};
+
+struct parse_result{
+    parse_status status {parse_status::invalid};
+    std::optional<packet> pkt;
+    size_t bytes_consumed{0};
+};
+
+parse_result parse_packet(std::span<char>);
 
 packet create_ping();
 packet create_pong();
