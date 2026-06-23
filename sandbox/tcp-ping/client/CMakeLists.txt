@@ -1,5 +1,5 @@
 add_executable(sandbox_tcp_ping_client
-    main.cpp
+    main.cc
 )
 
 target_compile_features(sandbox_tcp_ping_client

@@ -1,5 +1,5 @@
 add_library(dirtynet
-    dirtynet.cpp
+    dirtynet.cc
 )
 
 add_library(dirtyNet::dirtynet ALIAS dirtynet)
