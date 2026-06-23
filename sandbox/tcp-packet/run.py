@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--check-delay",
         type=float,
-        default=1.0,
+        default=5.0,
         help="Seconds to wait before checking that both processes have closed.",
     )
     parser.add_argument(

@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <iostream>
 
 namespace tcp_packet
 {
@@ -39,7 +40,7 @@ namespace tcp_packet
 
     packet::packet(const std::string& str) : msg(str) 
     {
-        datalen = msg.size();
+        datalen = str.size();
         hdr = type::greeting;
     }
 
@@ -51,11 +52,12 @@ namespace tcp_packet
         {
             return {};
         }
-        std::vector<char> outBuffer(hdrLength + datalenLen + datalen, 0);
+        std::vector<char> outBuffer(hdrLength, 0);
         auto networkHdr = ntohl(static_cast<uint32_t>(hdr));
         std::memcpy(outBuffer.data(), &networkHdr, hdrLength);
         if(hdr == type::greeting)
         {
+            outBuffer.resize(hdrLength + datalenLen + datalen);
             auto networkDatalen = ntohl(datalen);
             std::memcpy(outBuffer.data() + hdrLength, &networkDatalen, datalenLen);
             std::memcpy(outBuffer.data() + hdrLength + datalenLen, msg.data(), msg.length());
@@ -71,6 +73,9 @@ namespace tcp_packet
         constexpr size_t lengthSize = sizeof(packet::datalen);
         if(buffer.size() < headerSize)
         {
+            std::cout << "miscompare with legth + header: " 
+                      << "\n\theader " << headerSize
+                      << "\n\tBuffer " << buffer.size() << std::endl;  
             return {parse_status::incomplete, std::nullopt, 0};
         }
 
@@ -94,6 +99,10 @@ namespace tcp_packet
         // at this point we're checking to see if we have enough data / a valid msg
         if(buffer.size() < headerSize + lengthSize)
         {
+            std::cout << "miscompare with legth + header: " 
+                      << "\n\theader " << headerSize
+                      << "\n\tlength " << lengthSize
+                      << "\n\tBuffer " << buffer.size() << std::endl;  
             return {parse_status::incomplete, std::nullopt, 0};
         }
         
@@ -106,7 +115,10 @@ namespace tcp_packet
 
         // if we have enough bytes we create the message and return the packet 
         if(buffer.size() < totalLen)
-        {
+        {            
+            std::cout << "miscompare with legth + header: " 
+                      << "\n\ttotalLen " << totalLen
+                      << "\n\tBuffer " << buffer.size() << std::endl;  
             return {parse_status::incomplete, std::nullopt, 0};
         }
         std::string msg(buffer.data() + headerSize + lengthSize, payloadLen);
