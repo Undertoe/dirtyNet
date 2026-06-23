@@ -53,12 +53,12 @@ namespace tcp_packet
             return {};
         }
         std::vector<char> outBuffer(hdrLength, 0);
-        auto networkHdr = ntohl(static_cast<uint32_t>(hdr));
+        auto networkHdr = htonl(static_cast<uint32_t>(hdr));
         std::memcpy(outBuffer.data(), &networkHdr, hdrLength);
         if(hdr == type::greeting)
         {
             outBuffer.resize(hdrLength + datalenLen + datalen);
-            auto networkDatalen = ntohl(datalen);
+            auto networkDatalen = htonl(datalen);
             std::memcpy(outBuffer.data() + hdrLength, &networkDatalen, datalenLen);
             std::memcpy(outBuffer.data() + hdrLength + datalenLen, msg.data(), msg.length());
         }
