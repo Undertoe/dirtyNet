@@ -48,7 +48,7 @@ udp-ping: configure
 	python3 ./sandbox/udp-ping/run.py --build-dir $(BUILD_DIR)
 
 udp-many: configure
-	$(CMAKE) --build $(BUILD_DIR) --target sandbox_udp_many_host sandbox_udp_many_client
+	$(CMAKE) --build $(BUILD_DIR) --target sandbox_udp_many_host sandbox_udp_many_unicast_client sandbox_udp_many_multicast_client
 	python3 ./sandbox/udp-many/run.py --build-dir $(BUILD_DIR)
 
 tcp-ping: configure

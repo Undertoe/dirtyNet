@@ -79,6 +79,30 @@ Keep TCP stream behavior explicit:
 - dirtyNet can provide helpers for common read/write patterns, but the byte
   stream remains the underlying truth.
 
+## UDP Binding Modes
+
+The future `udp_socket` API should make binding the normal/default shape while
+still offering an explicit way to create a loose, unbound socket.
+
+Default bound mode:
+
+- Claim a local endpoint during construction or setup.
+- Make receive-oriented sockets predictable.
+- Fit server, subscriber, and long-lived local endpoint use cases.
+- Make the local address/port visible in the type's setup path instead of
+  relying on implicit kernel assignment.
+
+Loose mode:
+
+- Create a socket without calling `bind`.
+- Let the kernel assign the local endpoint when the socket sends.
+- Fit sender-only or request-style clients that do not need a stable local
+  port.
+- Keep the looser behavior deliberate in the API, not an accidental omission.
+
+The API naming should make this distinction hard to miss. Binding is about
+local endpoint ownership and predictability, not a performance optimization.
+
 ## Typed IO Is Opt-In
 
 Templated `read<T>` and `write<T>` APIs should only participate when `T`

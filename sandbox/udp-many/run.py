@@ -15,7 +15,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 
 HOST_EXE = Path("sandbox/udp-many/host/sandbox_udp_many_host")
-CLIENT_EXE = Path("sandbox/udp-many/client/sandbox_udp_many_client")
+UNICAST_CLIENT_EXE = Path("sandbox/udp-many/unicast-client/unicast-client")
+MULTICAST_CLIENT_EXE = Path("sandbox/udp-many/multicast-client/multicast-client")
+DEFAULT_BASE_PORT = 9000
+DEFAULT_MULTICAST_PORT = 9100
+DEFAULT_TIMEOUT_SECONDS = 30.0
+MAX_PORT = 65535
 
 
 def default_build_dir() -> Path:
@@ -47,6 +52,18 @@ def parse_args() -> argparse.Namespace:
         help="Number of clients to start.",
     )
     parser.add_argument(
+        "--base-port",
+        type=int,
+        default=DEFAULT_BASE_PORT,
+        help=f"First unicast client port. Defaults to {DEFAULT_BASE_PORT}.",
+    )
+    parser.add_argument(
+        "--multicast-port",
+        type=int,
+        default=DEFAULT_MULTICAST_PORT,
+        help=f"Shared multicast client port. Defaults to {DEFAULT_MULTICAST_PORT}.",
+    )
+    parser.add_argument(
         "--startup-delay",
         type=float,
         default=0.2,
@@ -55,10 +72,35 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--timeout",
         type=float,
-        default=10.0,
+        default=DEFAULT_TIMEOUT_SECONDS,
         help="Seconds to wait for all processes to finish before stopping them.",
     )
     return parser.parse_args()
+
+
+def validate_port(port: int, name: str) -> int:
+    if port < 1 or port > MAX_PORT:
+        raise ValueError(f"{name} must be between 1 and {MAX_PORT}")
+
+    return port
+
+
+def client_ports(base_port: int, clients: int) -> list[int]:
+    if clients < 0:
+        raise ValueError("--clients must be greater than or equal to 0")
+
+    validate_port(base_port, "--base-port")
+
+    if clients == 0:
+        return []
+
+    last_port = base_port + clients - 1
+    if last_port > MAX_PORT:
+        raise ValueError(
+            f"client port range {base_port}-{last_port} exceeds {MAX_PORT}"
+        )
+
+    return list(range(base_port, last_port + 1))
 
 
 def require_executable(build_dir: Path, exe: Path) -> Path:
@@ -101,8 +143,16 @@ def main() -> int:
     build_dir = args.build_dir.resolve()
 
     try:
+        unicast_ports = client_ports(args.base_port, args.clients)
+        multicast_port = validate_port(args.multicast_port, "--multicast-port")
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 2
+
+    try:
         require_executable(build_dir, HOST_EXE)
-        require_executable(build_dir, CLIENT_EXE)
+        require_executable(build_dir, UNICAST_CLIENT_EXE)
+        require_executable(build_dir, MULTICAST_CLIENT_EXE)
     except (FileNotFoundError, PermissionError) as error:
         print(error, file=sys.stderr)
         print("Build them first with: make udp-many", file=sys.stderr)
@@ -115,12 +165,21 @@ def main() -> int:
 
         time.sleep(args.startup_delay)
 
-        for client_id in range(args.clients):
+        for client_id, port in enumerate(unicast_ports):
             client = subprocess.Popen(
-                [f"./{CLIENT_EXE}", str(client_id)],
+                [f"./{UNICAST_CLIENT_EXE}", str(port)],
                 cwd=build_dir,
             )
-            processes.append((f"client-{client_id}", client))
+            processes.append((f"unicast-client-{client_id}:{port}", client))
+
+        for client_id in range(args.clients):
+            client = subprocess.Popen(
+                [f"./{MULTICAST_CLIENT_EXE}", str(multicast_port)],
+                cwd=build_dir,
+            )
+            processes.append(
+                (f"multicast-client-{client_id}:{multicast_port}", client)
+            )
 
         finished = wait_for_processes(processes, args.timeout)
         if not finished:
