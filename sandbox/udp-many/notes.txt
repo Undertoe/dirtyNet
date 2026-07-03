@@ -1,0 +1,4 @@
+Update the multicast client to use the bind fd rather than the socket fd.
+make sure all ports are using htons.
+host unicast dest should be an actual address. 
+update the run.py to launch clients then host.

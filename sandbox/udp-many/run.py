@@ -18,7 +18,7 @@ HOST_EXE = Path("sandbox/udp-many/host/sandbox_udp_many_host")
 UNICAST_CLIENT_EXE = Path("sandbox/udp-many/unicast-client/unicast-client")
 MULTICAST_CLIENT_EXE = Path("sandbox/udp-many/multicast-client/multicast-client")
 DEFAULT_BASE_PORT = 9000
-DEFAULT_MULTICAST_PORT = 9100
+DEFAULT_MULTICAST_PORT = 10000
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_PORT = 65535
 

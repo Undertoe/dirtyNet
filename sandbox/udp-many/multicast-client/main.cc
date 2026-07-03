@@ -1,9 +1,16 @@
+#include <asm-generic/socket.h>
 #include <charconv>
 #include <cstdint>
 #include <iostream>
 #include <limits>
 #include <string_view>
 #include <system_error>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 
 namespace
 {
@@ -41,7 +48,63 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::cout << "MULTICAST CLIENT: udp-many scaffold starting on port " << port << std::endl;
+    std::cout << "MULTICAST CLIENT: starting on port " << port << std::endl;
+
+    // setup the socket
+    sockaddr_in server{0};
+    sockaddr_in client{0};
+    auto sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(sockfd < 0)
+    {
+        std::cout << "MULTICAST CLIENT: client failed to create socket " << sockfd << std::endl;
+        return sockfd;
+    }
+
+    // set the socket to "reuse",  letting multiple sockets use the same port
+    int reuse = 1;
+    if(auto sockopt = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)); sockopt < 0)
+    {
+        std::cout << "MULTICAST CLIENT: set sock opt for multicast failed with error: " << sockopt << std::endl;
+        return sockopt;
+    }
+
+
+
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = htonl(INADDR_ANY); // multicast bind is to any
+    server.sin_port = htons(port);  // still need mutlicast port
+    socklen_t len = sizeof(server);
+
+    // bind so we can listen for incoming across the group
+    auto bindopt = bind(sockfd, (sockaddr*)&server, len); 
+    
+    if(bindopt < 0)
+    {
+        std::cout << "MULTICAST CLIENT: bind failed with error: " << bindopt << std::endl;
+        return bindopt;
+    }
+
+
+
+    // setup the group for multicast
+    // here we need the actual address we're listening to
+    ip_mreq multicast_mreq;
+    multicast_mreq.imr_multiaddr.s_addr = inet_addr("239.0.0.1");   // must be between 224.0.0.0 -> 239.255.255.255
+    multicast_mreq.imr_interface.s_addr = htonl(INADDR_ANY);    // this can be anything, we bind to any for now.
+    if(auto multicast_sockopt = setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multicast_mreq, sizeof(multicast_mreq)); multicast_sockopt < 0)
+    {
+        std::cout << "MULTICAST CLIENT: setting socket option for multicast failed: " << multicast_sockopt << std::endl;
+        return multicast_sockopt;
+    }
+
+
+    char buffer[1024];
+    int n = recvfrom(sockfd, buffer, 1024, MSG_WAITALL, (sockaddr*)&server, &len);
+    buffer[n] = '\0';
+    std::cout << "MULTICAST CLIENT: Recieved message from server: " << std::string(buffer) << std::endl;
+
+
+    close(sockfd);
 
     return 0;
 }

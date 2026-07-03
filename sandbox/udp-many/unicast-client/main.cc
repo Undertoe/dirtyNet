@@ -5,6 +5,10 @@
 #include <string_view>
 #include <system_error>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 namespace
 {
     bool parsePort(std::string_view value, std::uint16_t& port)
@@ -42,6 +46,27 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "UNICAST CLIENT: udp-many scaffold starting on port " << port << std::endl;
+    sockaddr_in server{0};
+    sockaddr_in client{0};
+    auto sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(sockfd < 0)
+    {
+        std::cout << "UNICAST CLIENT: client failed to create socket " << sockfd << std::endl;
+        return sockfd;
+    }
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = inet_addr("127.0.0.1");
+    server.sin_port = htons(port);
+    socklen_t len = sizeof(server);
+
+    char buffer[1024];
+    int n = recvfrom(sockfd, buffer, 1024, MSG_WAITALL, (sockaddr*)&server, &len);
+    buffer[n] = '\0';
+    std::cout << "UNICAST CLIENT: Recieved message from server: " << std::string(buffer) << std::endl;
+
+
+    close(sockfd);
+
 
     return 0;
 }
