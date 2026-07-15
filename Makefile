@@ -3,7 +3,7 @@ CMAKE ?= cmake
 BUILD_TYPE ?= Debug
 CMAKE_ARGS ?=
 
-.PHONY: help configure build test benchmark perf exec sandbox udp-ping tcp-ping tpc-ping tcp-packet all clean
+.PHONY: help configure build test benchmark perf exec sandbox udp-ping udp-many tcp-ping tpc-ping tcp-packet all clean
 
 help:
 	@echo "Targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make exec       Build and run the basic exec sample"
 	@echo "  make sandbox    Build and run sandbox samples"
 	@echo "  make udp-ping   Build UDP ping sandbox executables"
+	@echo "  make udp-many   Build UDP many sandbox executables"
 	@echo "  make tcp-ping   Build TCP ping sandbox executables"
 	@echo "  make tpc-ping   Alias for tcp-ping"
 	@echo "  make tcp-packet Build TCP packet sandbox executables"
@@ -38,12 +39,17 @@ exec: build
 
 sandbox: build
 	python3 ./sandbox/udp-ping/run.py --build-dir $(BUILD_DIR)
+	python3 ./sandbox/udp-many/run.py --build-dir $(BUILD_DIR)
 	python3 ./sandbox/tcp-ping/run.py --build-dir $(BUILD_DIR)
 	python3 ./sandbox/tcp-packet/run.py --build-dir $(BUILD_DIR)
 
 udp-ping: configure
 	$(CMAKE) --build $(BUILD_DIR) --target sandbox_udp_ping_server sandbox_udp_ping_client
 	python3 ./sandbox/udp-ping/run.py --build-dir $(BUILD_DIR)
+
+udp-many: configure
+	$(CMAKE) --build $(BUILD_DIR) --target sandbox_udp_many_host sandbox_udp_many_unicast_client sandbox_udp_many_multicast_client
+	python3 ./sandbox/udp-many/run.py --build-dir $(BUILD_DIR)
 
 tcp-ping: configure
 	$(CMAKE) --build $(BUILD_DIR) --target sandbox_tcp_ping_server sandbox_tcp_ping_client
