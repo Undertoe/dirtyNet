@@ -28,7 +28,7 @@ namespace
             return false;
         }
 
-        port = static_cast<std::uint16_t>(parsed);
+        port = htons(static_cast<std::uint16_t>(parsed));
         return true;
     }
 }
@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::cout << "MULTICAST CLIENT: starting on port " << port << std::endl;
+    std::cout << "MULTICAST CLIENT: starting on port " << ntohs(port) << std::endl;
 
     // setup the socket
     sockaddr_in server{0};
@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
     int reuse = 1;
     if(auto sockopt = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)); sockopt < 0)
     {
-        std::cout << "MULTICAST CLIENT: set sock opt for multicast failed with error: " << sockopt << std::endl;
+        std::cout << "MULTICAST CLIENT: set sock opt for multicast REUSEADDR failed with error: " << sockopt << std::endl;
         return sockopt;
     }
 
@@ -72,16 +72,16 @@ int main(int argc, char* argv[])
 
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY); // multicast bind is to any
-    server.sin_port = htons(port);  // still need mutlicast port
+    server.sin_port = port;  // still need mutlicast port
     socklen_t len = sizeof(server);
 
     // bind so we can listen for incoming across the group
-    auto bindopt = bind(sockfd, (sockaddr*)&server, len); 
+    auto bindfd = bind(sockfd, (sockaddr*)&server, len); 
     
-    if(bindopt < 0)
+    if(bindfd < 0)
     {
-        std::cout << "MULTICAST CLIENT: bind failed with error: " << bindopt << std::endl;
-        return bindopt;
+        std::cout << "MULTICAST CLIENT: bind failed with error: " << bindfd << std::endl;
+        return bindfd;
     }
 
 
@@ -93,7 +93,7 @@ int main(int argc, char* argv[])
     multicast_mreq.imr_interface.s_addr = htonl(INADDR_ANY);    // this can be anything, we bind to any for now.
     if(auto multicast_sockopt = setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multicast_mreq, sizeof(multicast_mreq)); multicast_sockopt < 0)
     {
-        std::cout << "MULTICAST CLIENT: setting socket option for multicast failed: " << multicast_sockopt << std::endl;
+        std::cout << "MULTICAST CLIENT: setting socket option for multicast ADD MEMBERSHIP failed: " << multicast_sockopt << std::endl;
         return multicast_sockopt;
     }
 
@@ -105,6 +105,8 @@ int main(int argc, char* argv[])
 
 
     close(sockfd);
+
+    std::cout << "MULTICAST CLIENT: Exited" << std::endl;
 
     return 0;
 }

@@ -7,6 +7,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -19,8 +20,12 @@ UNICAST_CLIENT_EXE = Path("sandbox/udp-many/unicast-client/unicast-client")
 MULTICAST_CLIENT_EXE = Path("sandbox/udp-many/multicast-client/multicast-client")
 DEFAULT_BASE_PORT = 9000
 DEFAULT_MULTICAST_PORT = 10000
-DEFAULT_TIMEOUT_SECONDS = 30.0
+DEFAULT_TIMEOUT_SECONDS = 5.0
+SHUTDOWN_GRACE_SECONDS = 2.0
 MAX_PORT = 65535
+
+ProcessEntry = tuple[str, subprocess.Popen[str], threading.Thread]
+OUTPUT_LOCK = threading.Lock()
 
 
 def default_build_dir() -> Path:
@@ -66,14 +71,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--startup-delay",
         type=float,
-        default=0.2,
-        help="Seconds to wait after starting the host before starting clients.",
+        default=0.0,
+        help="Optional seconds to wait after starting the host before starting clients.",
     )
     parser.add_argument(
         "--timeout",
         type=float,
         default=DEFAULT_TIMEOUT_SECONDS,
-        help="Seconds to wait for all processes to finish before stopping them.",
+        help=f"Seconds to wait for all processes to finish before stopping them. Defaults to {DEFAULT_TIMEOUT_SECONDS:g}.",
     )
     return parser.parse_args()
 
@@ -112,35 +117,113 @@ def require_executable(build_dir: Path, exe: Path) -> Path:
     return exe_path
 
 
-def stop_process(process: subprocess.Popen[bytes]) -> int:
-    if process.poll() is not None:
-        return process.returncode
-
-    process.send_signal(signal.SIGTERM)
-    try:
-        return process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        return process.wait()
-
-
 def wait_for_processes(
-    processes: list[tuple[str, subprocess.Popen[bytes]]],
+    processes: list[ProcessEntry],
     timeout: float,
 ) -> bool:
     deadline = time.monotonic() + timeout
 
     while time.monotonic() < deadline:
-        if all(process.poll() is not None for _, process in processes):
+        if all(process.poll() is not None for _, process, _ in processes):
             return True
         time.sleep(0.05)
 
-    return all(process.poll() is not None for _, process in processes)
+    return all(process.poll() is not None for _, process, _ in processes)
+
+
+def reap_processes(processes: list[ProcessEntry]) -> None:
+    for _, process, _ in processes:
+        process.wait()
+    for _, _, output_thread in processes:
+        output_thread.join(timeout=1)
+
+
+def print_process_statuses(processes: list[ProcessEntry]) -> None:
+    for name, process, _ in processes:
+        status = process.poll()
+        if status is None:
+            print(f"{name} is still running.", file=sys.stderr)
+        else:
+            print(f"{name} exited with status {status}.", file=sys.stderr)
+
+
+def stop_processes(
+    processes: list[ProcessEntry],
+    reason: str,
+) -> None:
+    running_processes = [
+        (name, process) for name, process, _ in processes if process.poll() is None
+    ]
+    if not running_processes:
+        reap_processes(processes)
+        print_process_statuses(processes)
+        return
+
+    print(reason, file=sys.stderr)
+    print_process_statuses(processes)
+
+    for name, process in running_processes:
+        print(f"{name} still running; sending SIGTERM.", file=sys.stderr)
+        process.send_signal(signal.SIGTERM)
+
+    deadline = time.monotonic() + SHUTDOWN_GRACE_SECONDS
+    while time.monotonic() < deadline:
+        if all(process.poll() is not None for _, process, _ in processes):
+            reap_processes(processes)
+            return
+        time.sleep(0.05)
+
+    for name, process, _ in processes:
+        if process.poll() is None:
+            print(f"{name} ignored SIGTERM; sending SIGKILL.", file=sys.stderr)
+            process.kill()
+
+    reap_processes(processes)
+    print_process_statuses(processes)
+
+
+def forward_output(name: str, process: subprocess.Popen[str]) -> None:
+    if process.stdout is None:
+        return
+
+    for line in process.stdout:
+        with OUTPUT_LOCK:
+            print(f"[{name}] {line}", end="", flush=True)
+
+
+def launch_process(
+    processes: list[ProcessEntry],
+    name: str,
+    command: list[str],
+    cwd: Path,
+) -> None:
+    with OUTPUT_LOCK:
+        print(f"[runner] starting {name}", flush=True)
+
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    output_thread = threading.Thread(
+        target=forward_output,
+        args=(name, process),
+        daemon=True,
+    )
+    output_thread.start()
+    processes.append((name, process, output_thread))
 
 
 def main() -> int:
     args = parse_args()
     build_dir = args.build_dir.resolve()
+
+    if args.timeout < 0:
+        print("--timeout must be greater than or equal to 0", file=sys.stderr)
+        return 2
 
     try:
         unicast_ports = client_ports(args.base_port, args.clients)
@@ -158,46 +241,43 @@ def main() -> int:
         print("Build them first with: make udp-many", file=sys.stderr)
         return 1
 
-    processes: list[tuple[str, subprocess.Popen[bytes]]] = []
+    processes: list[ProcessEntry] = []
     try:
-        host = subprocess.Popen([f"./{HOST_EXE}"], cwd=build_dir)
-        processes.append(("host", host))
+        launch_process(processes, "host", [f"./{HOST_EXE}"], build_dir)
 
-        time.sleep(args.startup_delay)
+        if args.startup_delay > 0:
+            time.sleep(args.startup_delay)
 
         for client_id, port in enumerate(unicast_ports):
-            client = subprocess.Popen(
+            launch_process(
+                processes,
+                f"unicast-client-{client_id}:{port}",
                 [f"./{UNICAST_CLIENT_EXE}", str(port)],
-                cwd=build_dir,
+                build_dir,
             )
-            processes.append((f"unicast-client-{client_id}:{port}", client))
 
         for client_id in range(args.clients):
-            client = subprocess.Popen(
+            launch_process(
+                processes,
+                f"multicast-client-{client_id}:{multicast_port}",
                 [f"./{MULTICAST_CLIENT_EXE}", str(multicast_port)],
-                cwd=build_dir,
-            )
-            processes.append(
-                (f"multicast-client-{client_id}:{multicast_port}", client)
+                build_dir,
             )
 
         finished = wait_for_processes(processes, args.timeout)
         if not finished:
-            for name, process in processes:
-                if process.poll() is None:
-                    print(
-                        f"{name} still running after {args.timeout:g}s; stopping.",
-                        file=sys.stderr,
-                    )
-                    stop_process(process)
+            stop_processes(
+                processes,
+                f"Timeout reached after {args.timeout:g}s; stopping child processes.",
+            )
             return 124
     except KeyboardInterrupt:
-        print("Interrupted; stopping child processes.", file=sys.stderr)
-        for _, process in processes:
-            stop_process(process)
+        stop_processes(processes, "Interrupted; stopping child processes.")
         return 130
 
-    for _, process in processes:
+    reap_processes(processes)
+
+    for _, process, _ in processes:
         if process.returncode != 0:
             return process.returncode
     return 0

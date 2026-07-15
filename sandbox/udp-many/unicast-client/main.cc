@@ -25,7 +25,7 @@ namespace
             return false;
         }
 
-        port = static_cast<std::uint16_t>(parsed);
+        port = htons(static_cast<std::uint16_t>(parsed));
         return true;
     }
 }
@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::cout << "UNICAST CLIENT: udp-many scaffold starting on port " << port << std::endl;
+    std::cout << "UNICAST CLIENT: udp-many scaffold starting on port " << ntohs(port) << std::endl;
     sockaddr_in server{0};
     sockaddr_in client{0};
     auto sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -54,9 +54,21 @@ int main(int argc, char* argv[])
         std::cout << "UNICAST CLIENT: client failed to create socket " << sockfd << std::endl;
         return sockfd;
     }
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = inet_addr("127.0.0.1");
-    server.sin_port = htons(port);
+
+    sockaddr_in local{};
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_ANY);
+    local.sin_port = port;
+
+    if(auto bound = bind(sockfd, reinterpret_cast<sockaddr*>(&local), sizeof(local)); bound < 0)
+    {
+        std::cout << "UNICAST CLIENT: Client failed to bind to localaddr. error: " << bound << std::endl;
+        return bound;
+    }
+
+    // server.sin_family = AF_INET;
+    // server.sin_addr.s_addr = inet_addr("127.0.0.1");
+    // server.sin_port = port;
     socklen_t len = sizeof(server);
 
     char buffer[1024];
@@ -67,6 +79,7 @@ int main(int argc, char* argv[])
 
     close(sockfd);
 
+    std::cout << "UNICAST CLIENT: Exited" << std::endl;
 
     return 0;
 }

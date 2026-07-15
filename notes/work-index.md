@@ -18,6 +18,8 @@ Primary reference: `notes/plan-going-forward.md`.
 
 Main library notes: `notes/dirtynet-library-notes.md`.
 
+Planned feature notes: `notes/planned-features.md`.
+
 Current UDP learning notes: `notes/udp-pingpong-library-notes.md`.
 
 ## Ordered Task Queue
