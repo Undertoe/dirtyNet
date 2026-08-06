@@ -6,6 +6,8 @@
 - Use the new `.devcontainer/` as the cross-platform Linux development environment for Windows, macOS Intel, and macOS Apple Silicon hosts.
 - Decide the new active project layout before introducing fresh C++ source files.
 - Create a modern root build setup once the target layout is chosen.
+- Complete the revision 0 design pass in `notes/rev0-design.md` and
+  `notes/rev0-design-questions.md` before promoting the proposed API into code.
 
 ## Upcoming Tasks
 
@@ -23,8 +25,14 @@
 ## Rebuild Direction
 
 - Define the smallest useful dirtyNet core API before carrying over old implementation ideas.
+- Keep the public API OS agnostic while implementing the first backend for POSIX;
+  isolate native endpoints, socket handles, and errors for future Windows work.
 - Start the address foundation with port and IP value types that reduce byte-order
   and IPv4/IPv6 setup ceremony.
+- Use distinct UDP and TCP public resource types rather than a generic public
+  socket base; share native ownership internally where useful.
+- Treat event-driven callback usage as the preferred high-level workflow while
+  retaining direct byte-oriented operations.
 - Use the UDP ping-pong sandbox to identify concrete boilerplate that should move behind endpoint and socket abstractions.
 - Choose the active source layout, likely separating public headers, implementation, tests, benchmarks, and examples.
 - Establish the baseline C++ standard, compiler warnings, sanitizers, and formatting expectations.
