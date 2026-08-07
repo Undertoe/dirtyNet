@@ -308,23 +308,52 @@ the same public behavior.
 
 ## Execution Strategy Template
 
-The current public direction uses a strategy template:
+The current public direction uses an execution-strategy template together with
+an independent storage-policy template:
 
 ```cpp
-udp_socket<strategy>
-tcp_connection_handler<strategy>
-tcp_connection<strategy>
+udp_socket<strategy, storage>
+tcp_connection_handler<strategy, storage>
+tcp_connection<strategy, storage>
 ```
+
+The execution strategy selects how completion is observed while the transport
+type selects which operations exist and what those operations mean. Sync and
+async sockets use unified operation names:
+
+```cpp
+udp_socket<sync, storage>.receive();
+udp_socket<async, storage>.receive();
+
+tcp_connection<sync, storage>.read();
+tcp_connection<async, storage>.read();
+```
+
+Logically:
+
+```text
+sync
+    operation completes before returning
+    completion value is returned directly
+
+async
+    operation is initiated before returning
+    future-like operation exposes eventual completion
+```
+
+The exact async operation type and implementation are deferred. Async TCP
+connection establishment is a required future capability, but it does not need
+to be designed before the first synchronous UDP vertical slice.
 
 Connections accepted by a handler inherit its strategy:
 
 ```text
-tcp_connection_handler<strategy>
+tcp_connection_handler<strategy, storage>
                 |
               accept
                 |
                 v
-tcp_connection<strategy>
+tcp_connection<strategy, storage>
 ```
 
 Normal callback usage can rely on generic lambdas so callers do not repeatedly
@@ -343,17 +372,58 @@ template name is used as a lambda parameter type. Explicitly named callback
 arguments would need the strategy or an alias. Generic lambdas are the current
 beginner-facing answer.
 
-What `strategy` owns is intentionally unresolved. In particular, synchronous
-versus asynchronous API behavior, readiness polling, thread ownership, handler
-scheduling, and cancellation must not be silently collapsed into one vague
-concept. See `notes/rev0-design-questions.md`.
+Each execution strategy owns a nested runtime `params` type. Readiness polling,
+thread ownership, handler scheduling, and cancellation remain intentionally
+unresolved and must not be silently collapsed into the broad sync/async label.
+
+## Storage Policies
+
+Receive-byte ownership is an independent policy axis:
+
+```cpp
+udp_socket<strategy, storage>
+tcp_connection<strategy, storage>
+```
+
+The revision 0 default is caller-owned storage. A successful receive transfers
+an owning `std::vector<std::byte>` to the caller. Socket-owned borrowed storage
+is optional future customization, not the beginner-facing default.
+
+Possible policy families include:
+
+```text
+caller_owned_storage    owning bytes returned to the caller
+internal_storage        socket-owned reusable bytes and borrowed views
+pooled_storage          owning leases returned to a pool
+allocator-aware storage later
+```
+
+Each storage policy defines and interprets its own nested runtime `params` type.
+The same convention applies to execution strategies:
+
+```cpp
+struct sync {
+    struct params;
+};
+
+struct caller_owned_storage {
+    struct params;
+};
+```
+
+Concepts may eventually enforce these policy shapes. They do not need to be
+implemented before the first vertical slice.
+
+Kernel socket receive-buffer capacity and application datagram storage are
+different settings. A storage policy controls application-side bytes; native
+socket options control the OS queue.
 
 ## UDP Resource Model
 
 Revision 0 currently favors one public UDP resource type:
 
 ```cpp
-udp_socket<strategy>
+udp_socket<strategy, storage>
 ```
 
 Loose and explicitly bound UDP sockets have substantially the same operation
@@ -361,64 +431,98 @@ set. Both can send datagrams, both can receive, and a loose socket may become
 implicitly bound by the OS. The difference is how the local endpoint is chosen,
 not a clean separation of capabilities.
 
-Provisional factory shapes are:
+Public socket resources are created only through fallible protocol-facade
+factories. Their constructors remain private so callers cannot create an
+unchecked or invalid native resource.
+
+The factory functions deduce policy types from ordinary function parameters:
 
 ```cpp
-std::expected<udp_socket<strategy>, udp_socket_error>
-udp_socket<strategy>::open();
+auto socket = udp::open();
+auto bound = udp::bind(local_endpoint);
 
-std::expected<udp_socket<strategy>, udp_socket_error>
-udp_socket<strategy>::bind(endpoint local);
+auto customized = udp::bind(
+    local_endpoint,
+    async{async::params{/* settings */}},
+    caller_owned_storage{
+        caller_owned_storage::params{/* settings */}
+    }
+);
 ```
 
-The alternative protocol-facade spelling remains open:
+The default result type is conceptually:
 
 ```cpp
-std::expected<udp_socket<strategy>, udp_socket_error>
-udp<strategy>::open();
-
-std::expected<udp_socket<strategy>, udp_socket_error>
-udp<strategy>::bind(endpoint local);
+std::expected<
+    udp_socket<sync, caller_owned_storage>,
+    udp_socket_error
+>
 ```
+
+`udp::open()` creates a valid loose UDP socket, normally for sender-style use.
+`udp::bind(endpoint)` creates a valid socket bound to the supplied local
+endpoint, normally for receiving. Both return the same resource type. A loose
+socket's native address-family default is provisionally IPv4 with an explicit
+IPv6 override to be shaped later.
 
 Direct operations conceptually include:
 
 ```cpp
 std::expected<std::size_t, udp_send_error>
-socket.send_to(endpoint destination, byte_view payload);
+socket.send_to(
+    endpoint destination,
+    std::span<const std::byte> payload
+);
 
-std::expected<udp_receive_result, udp_receive_error>
-socket.receive_from(mutable_byte_view destination);
+std::expected<udp_datagram, udp_receive_error>
+socket.receive();
 ```
 
-with a transport-specific result:
+with a caller-owned transport-specific result:
 
 ```cpp
-struct udp_receive_result {
-    std::size_t bytes_received;
+struct udp_datagram {
+    std::vector<std::byte> bytes;
     endpoint sender;
+    bool truncated;
 };
 ```
+
+Returning the successful send byte count intentionally preserves evidence for
+application protocol code. A zero-length UDP datagram remains a successful
+receive with an empty byte vector; UDP has no TCP-style EOF.
 
 The preferred event-driven operation conceptually resembles:
 
 ```cpp
-socket.on_receive([](udp_read_event event) {
-    process(event.bytes);
-    inspect(event.sender);
+socket.on_receive([](udp_datagram datagram) -> void {
+    process(std::move(datagram));
 });
 ```
 
-The exact return type and event ownership are unresolved. A connected UDP type
-may eventually deserve a separate capability model because native UDP connect
-changes peer filtering and permits destination-free send/receive calls. It is
-not required to shape the initial MVP.
+The callback must return exactly `void` for revision 0. It handles one successful
+datagram and does not control loop continuation through a return value. The
+`on_receive()` call has a strategy-dependent result:
+
+```text
+sync
+    blocks, invokes callbacks sequentially on the calling thread,
+    and directly returns terminal completion/error information
+
+async
+    returns a future-like operation whose eventual result contains
+    equivalent terminal completion/error information
+```
+
+Fine-grained operation types and threading mechanisms are deferred. A connected
+UDP type may eventually deserve a separate capability model because native UDP
+connect changes peer filtering and permits destination-free send/receive calls.
 
 ## TCP Resource Model
 
 The current TCP model uses two distinct public roles.
 
-### `tcp_connection_handler<strategy>`
+### `tcp_connection_handler<strategy, storage>`
 
 This is the bound server-side resource. Its intended responsibilities are:
 
@@ -433,13 +537,12 @@ connections rather than reading application bytes itself. Within dirtyNet
 documentation, `connection_callback` should name the user callable so it is not
 confused with the owning `tcp_connection_handler` resource.
 
-Provisional creation and direct acceptance:
+Provisional creation and direct acceptance use the protocol facade:
 
 ```cpp
-std::expected<tcp_connection_handler<strategy>, tcp_server_error>
-tcp_connection_handler<strategy>::bind(endpoint local);
+auto handler = tcp::bind(local_endpoint, strategy{}, storage{});
 
-std::expected<tcp_connection<strategy>, tcp_accept_error>
+std::expected<tcp_connection<strategy, storage>, tcp_accept_error>
 handler.accept();
 ```
 
@@ -460,7 +563,7 @@ Direct `accept()` and managed `on_connection()` should not consume connections
 from the same native accept queue concurrently without an explicit policy.
 Revision 0 needs a guard or mode boundary for this conflict.
 
-### `tcp_connection<strategy>`
+### `tcp_connection<strategy, storage>`
 
 This represents one established TCP byte-stream connection, whether created by
 an outbound client connection or returned by server-side acceptance.
@@ -476,8 +579,7 @@ Responsibilities include:
 Provisional outbound creation:
 
 ```cpp
-std::expected<tcp_connection<strategy>, tcp_connect_error>
-tcp_connection<strategy>::connect(endpoint remote);
+auto connection = tcp::connect(remote_endpoint, strategy{}, storage{});
 ```
 
 Provisional direct I/O:
@@ -507,25 +609,24 @@ dirtyNet should define a common byte-storage vocabulary for socket I/O. The
 same byte view/storage concepts can be used across transports without erasing
 transport-specific event meaning.
 
-Conceptually:
+The beginner-facing default uses owning bytes:
 
 ```cpp
-struct udp_read_event {
-    byte_view bytes;
+struct udp_datagram {
+    std::vector<std::byte> bytes;
     endpoint sender;
 };
 
-struct tcp_read_event {
-    byte_view bytes;
+struct tcp_read_data {
+    std::vector<std::byte> bytes;
 };
 ```
 
 UDP events represent complete datagrams unless truncation is explicitly
 reported. TCP events represent available stream chunks and must never imply
-application message boundaries.
-
-Exact types, allocation strategy, mutability, ownership, and callback lifetime
-are high-priority open questions.
+application message boundaries. Advanced borrowed, pooled, or allocator-aware
+representations can expose the same logical byte access through other storage
+policies later.
 
 ## Event-Driven And Direct APIs
 
@@ -571,6 +672,34 @@ The event API should be implemented from the same transport contracts, error
 model, and native ownership rules. It should not become a behaviorally separate
 socket system.
 
+Event data callbacks return exactly `void`. Receive-loop completion and errors
+belong to the strategy-dependent result of `on_receive()`, not to each
+successful-data callback.
+
+## Resource Termination
+
+Socket-owning resources expose an intentionally abrasive termination operation:
+
+```cpp
+void kill() noexcept;
+```
+
+`kill()` is an unconditional, abortive termination boundary:
+
+- It never throws.
+- It is safe to request repeatedly.
+- It prevents future I/O and callback registration.
+- It requests termination of active operations.
+- It releases the native resource on a best-effort basis.
+- Pending operations complete with a killed terminal state rather than an
+  exception.
+- The killed object remains permanently unusable and cannot be reopened,
+  rebound, reconnected, or restarted.
+
+Creating another usable resource requires another protocol-factory call.
+Graceful TCP shutdown is a separate later contract. Resource destructors use
+the same non-throwing cleanup foundation.
+
 ## Error Model
 
 Revision 0 construction factories use `std::expected`.
@@ -615,6 +744,54 @@ experiments demonstrate an immediate need:
 - Multiple readiness backends
 - Scatter/gather and zero-copy claims
 - Throwing convenience constructors
+
+## Revision 0 Distribution And Source Boundary
+
+Revision 0 will begin as a primarily header-only C++ library. Strategy and
+storage-policy template definitions naturally remain visible in public headers,
+and a header-first implementation keeps early consumption and iteration simple.
+
+Header-only does not mean that native details may spread throughout the public
+API. POSIX-specific behavior should remain behind identifiable internal seams
+such as:
+
+```cpp
+dirtynet::detail::native_socket
+dirtynet::detail::native_endpoint
+```
+
+The first build target can be a CMake `INTERFACE` library. Native wrappers can
+be defined inline for revision 0 and moved into compiled source files later
+without changing the public responsibility model.
+
+A provisional layout is:
+
+```text
+include/dirtynet/
+|-- dirtynet.hpp
+|-- endpoint.hpp
+|-- ip.hpp
+|-- port.hpp
+|-- udp.hpp
+|-- strategy/
+|-- storage/
+`-- detail/
+    |-- native_endpoint.hpp
+    |-- native_socket.hpp
+    `-- posix/
+
+tests/
+|-- address/
+|-- udp/
+`-- integration/
+
+sandbox/
+`-- udp-pingpong/
+    `-- readme.md
+```
+
+The exact file granularity remains open. Every sandbox subproject must retain a
+short `readme.md` with strict exercise goals.
 
 ## Revision 0 Success Shape
 

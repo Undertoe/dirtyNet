@@ -17,6 +17,31 @@ Each section records:
 The order below is intentional. Ownership and behavior should be understood
 before selecting epoll structures, thread counts, or advanced templates.
 
+## Decisions Recorded On 2026-08-07
+
+The following high-level decisions reduce the open space in later sections:
+
+- Sync and async strategies use unified operation names; the strategy changes
+  how completion is observed.
+- Storage ownership is an independent policy axis.
+- The default storage policy transfers caller-owned
+  `std::vector<std::byte>` values.
+- Strategy and storage policy types each own a nested runtime `params` type.
+- Non-template `udp` and `tcp` protocol facades expose function-template
+  factories that deduce strategy and storage policy objects from parameters.
+- Public socket-resource constructors remain private; factories return
+  `std::expected` and only expose valid resources.
+- UDP `send_to()` returns the successful byte count.
+- UDP `receive()` returns an owning datagram containing bytes and sender.
+- UDP zero-byte datagrams are successful data, not EOF.
+- `on_receive()` data callbacks return exactly `void`.
+- `on_receive()` itself exposes strategy-dependent terminal completion/error
+  information.
+- Socket-owning resources expose permanent, idempotent `kill() noexcept`
+  semantics; killed resources cannot be reused.
+- Revision 0 starts primarily header-only while isolating native backend details
+  for later extraction into a compiled library.
+
 ## Priority 1: Define The Execution Strategy Contract
 
 ### Question
@@ -24,9 +49,9 @@ before selecting epoll structures, thread counts, or advanced templates.
 What does the template argument in these types promise?
 
 ```cpp
-udp_socket<strategy>
-tcp_connection_handler<strategy>
-tcp_connection<strategy>
+udp_socket<strategy, storage>
+tcp_connection_handler<strategy, storage>
+tcp_connection<strategy, storage>
 ```
 
 ### Why It Matters
@@ -50,8 +75,8 @@ will appear strongly specified while their actual behavior remains surprising.
 #### A. Strategy Means Only `sync` Or `async`
 
 ```cpp
-udp_socket<sync>
-udp_socket<async>
+udp_socket<sync, caller_owned_storage>
+udp_socket<async, caller_owned_storage>
 ```
 
 The implementation selects strong defaults for polling and threading.
@@ -91,7 +116,7 @@ Pressures:
 #### C. Strategy Selects Broad Semantics And Accepts Runtime Context
 
 ```cpp
-udp_socket<async> socket{io_context};
+udp_socket<async, caller_owned_storage> socket{io_context};
 ```
 
 The type selects sync/async behavior while an injected context owns polling,
@@ -230,7 +255,7 @@ handler.on_connection([](auto& connection) {
 Direct acceptance clearly transfers ownership:
 
 ```cpp
-std::expected<tcp_connection<strategy>, tcp_accept_error>
+std::expected<tcp_connection<strategy, storage>, tcp_accept_error>
 handler.accept();
 ```
 
@@ -259,7 +284,7 @@ Pressures:
 #### B. The Connection Callback Receives Ownership
 
 ```cpp
-handler.on_connection([](tcp_connection<strategy> connection) {
+handler.on_connection([](tcp_connection<strategy, storage> connection) {
     application_connections.add(std::move(connection));
 });
 ```
@@ -308,11 +333,12 @@ connections can involve the same remote IP and port at different times, and
 local endpoint details also participate in a connection tuple. Connection
 management should not assume an endpoint is a permanent unique key.
 
-## Priority 4: Define Byte And Event Ownership
+## Priority 4: Refine Byte And Event Ownership Beyond The Default
 
 ### Question
 
-What does a callback own when it receives bytes?
+The default callback receives caller-owned bytes. What additional storage
+policies, if any, must revision 0 implement?
 
 ```cpp
 connection.on_receive([](tcp_read_event event) {
@@ -320,7 +346,7 @@ connection.on_receive([](tcp_read_event event) {
 });
 ```
 
-### Candidate Models
+### Candidate Models Beyond Caller-Owned `std::vector<std::byte>`
 
 #### A. Borrowed View Valid Only During Callback
 
@@ -536,15 +562,13 @@ behavior behind an ambiguous `read` or `write` contract.
 
 ### Loose Versus Bound Creation
 
-Current direction uses one `udp_socket<strategy>` type returned from two
+Current direction uses one `udp_socket<strategy, storage>` type returned from two
 factories:
 
 ```cpp
-std::expected<udp_socket<strategy>, udp_socket_error>
-udp_socket<strategy>::open();
+auto socket = udp::open(strategy{}, storage{});
 
-std::expected<udp_socket<strategy>, udp_socket_error>
-udp_socket<strategy>::bind(endpoint local);
+auto bound = udp::bind(endpoint, strategy{}, storage{});
 ```
 
 Open questions:
@@ -571,41 +595,26 @@ Questions:
 Connected UDP changes semantics enough that it may eventually justify:
 
 ```cpp
-connected_udp_socket<strategy>
+connected_udp_socket<strategy, storage>
 ```
 
 This should remain deferred until raw POSIX experiments show which capabilities
 and errors should be exposed.
 
-## Priority 8: Decide Factory Placement And Naming
+## Priority 8: Refine Factory Naming And Parameter Ordering
 
-### Current Alternatives
+### Current Direction
 
-Protocol-facade factories:
-
-```cpp
-std::expected<udp_socket<strategy>, udp_socket_error>
-udp<strategy>::bind(endpoint local);
-
-std::expected<tcp_connection_handler<strategy>, tcp_server_error>
-tcp<strategy>::bind(endpoint local);
-
-std::expected<tcp_connection<strategy>, tcp_connect_error>
-tcp<strategy>::connect(endpoint remote);
-```
-
-Resource-type factories:
+Protocol-facade function templates deduce policy arguments:
 
 ```cpp
-std::expected<udp_socket<strategy>, udp_socket_error>
-udp_socket<strategy>::bind(endpoint local);
-
-std::expected<tcp_connection_handler<strategy>, tcp_server_error>
-tcp_connection_handler<strategy>::bind(endpoint local);
-
-std::expected<tcp_connection<strategy>, tcp_connect_error>
-tcp_connection<strategy>::connect(endpoint remote);
+auto socket = udp::bind(endpoint, strategy{}, storage{});
+auto handler = tcp::bind(endpoint, strategy{}, storage{});
+auto connection = tcp::connect(endpoint, strategy{}, storage{});
 ```
+
+The default arguments select `sync` and `caller_owned_storage`. No intermediate
+`socket_config` object is currently wanted.
 
 ### Evaluation Criteria
 
@@ -616,8 +625,8 @@ tcp_connection<strategy>::connect(endpoint remote);
 - Can factories share configuration without introducing a context prematurely?
 - Does UDP naming provide evidence for TCP naming rather than forcing symmetry?
 
-The current plan is to explore the UDP API first, then select naming based on
-the most natural complete usage examples.
+Complete usage examples should still verify argument ordering and whether the
+`udp`/`tcp` facade names remain readable in practice.
 
 ## Priority 9: Define Hostname Resolution Boundaries
 
@@ -825,20 +834,17 @@ Items to explicitly approve or defer:
 
 ## Recommended Next Conversation Order
 
-1. Walk through synchronous `udp_socket::on_receive` from creation through
-   cancellation and destruction.
-2. Walk through asynchronous `udp_socket::on_receive` from the same caller
-   perspective without selecting an OS polling primitive.
-3. Define whether `strategy` captures only those semantic differences or also
-   owns scheduling resources.
-4. Decide byte-event ownership using one UDP and one TCP example.
-5. Decide ownership of connections accepted through `on_connection`.
-6. Define event operation handles and shutdown behavior.
-7. Define direct TCP read/write and EOF/partial-progress results.
-8. Compare complete UDP and TCP examples to settle factory placement and names.
-9. Approve the revision 0 capability table.
-10. Only then design the first POSIX implementation experiments for blocking
-    calls, nonblocking mode, epoll, and threads.
+1. Produce and approve a concise provisional UDP API sheet from the decisions
+   already recorded.
+2. Finalize the header-only source/file layout and CMake `INTERFACE` target.
+3. Define the minimum portable error values needed by address construction and
+   blocking UDP factories/I/O.
+4. Approve the first implementation slice: address foundation plus blocking
+   caller-owned UDP bind/send/receive.
+5. Decide the implementation branch workflow after the documentation branch is
+   reviewed or merged.
+6. Defer detailed async operation handles, polling, and thread mechanics until
+   blocking UDP behavior supplies implementation evidence.
 
 ## Questions That Do Not Need Answers Yet
 
