@@ -13,6 +13,12 @@
 #include <algorithm>
 #include <ranges>
 
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 namespace {
 
 bool parse_port(std::string_view text, std::uint16_t& port)
@@ -26,14 +32,14 @@ bool parse_port(std::string_view text, std::uint16_t& port)
         return false;
     }
 
-    port = static_cast<std::uint16_t>(parsed_port);
+    port = htons(static_cast<std::uint16_t>(parsed_port));
     return true;
 }
 
 // fd is the only thing we need for the connection since each should get their own buffer 
 // & handling
 // we added port so that we can use that for debugging.
-void handle_connection(int fd, uint16_t port) 
+void handle_connection(int fd, uint32_t id) 
 {
     std::array<char, 64> buffer;
 
@@ -49,7 +55,7 @@ void handle_connection(int fd, uint16_t port)
         // error handling
         if(bytesRead < 0)
         {
-            std::cout << "Connection error for port " << port << ".  Closing" << std::endl;
+            std::cout << "Connection error for port " << id << ".  Closing" << std::endl;
             close(fd);
             return;
         }
@@ -57,7 +63,7 @@ void handle_connection(int fd, uint16_t port)
         // first escape out if we have bytesRead == 0, this is connection closed.
         if(bytesRead == 0)
         {
-            std::cout << "Connection closed for port " << port << std::endl;
+            std::cout << "Connection closed for port " << id << std::endl;
             close(fd);
             return;
         }
@@ -87,7 +93,7 @@ void handle_connection(int fd, uint16_t port)
                 if(written < 0)
                 {
                     int error = errno;
-                    std::cout << "Connection error with server and port " << port << ". closing prematurely." << std::endl;
+                    std::cout << "Connection error with server and port " << id << ". closing prematurely." << std::endl;
                     std::cout << "Error code: " << std::error_code(error, std::generic_category()).message() << std::endl;
                     close(fd);
                     return;
@@ -111,6 +117,8 @@ void handle_connection(int fd, uint16_t port)
             bytesAvailable.remove_prefix(next + 1); // clear out our bytes to +1 of our index.
         }
     }
+
+    close(fd);
 }
 
 } // namespace
@@ -127,6 +135,51 @@ int main(int argc, char* argv[])
         std::cerr << "Invalid port: " << argv[1] << '\n';
         return 1;
     }
+    auto sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    sockaddr_in server{0};
+    sockaddr_in client{0};
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = htonl(INADDR_ANY);
+    server.sin_port = port;
+
+
+    if(auto bound = bind(sockfd, (sockaddr*) &server, sizeof(server)); bound < 0)
+    {
+        std::cout << "SERVER: binding to socket " << sockfd << " failed. " << bound << std::endl;
+        return bound;
+    }
+
+    
+    if(auto list = listen(sockfd, 5); list != 0)
+    {
+        std::cout << "SERVER: Soocket listen failed: " << list << std::endl;
+        return list;
+    }
+    socklen_t len = sizeof(client);
+
+    std::vector<std::pair<std::jthread, int>> threads;
+
+    while(true)
+    {
+        auto connfd = accept(sockfd, (sockaddr*) & client, &len); 
+        if (connfd < 0)
+        {
+            std::cout << "SERVER: accept() failed: " << connfd << std::endl;
+            return connfd;
+        }
+
+        // now we have a new connection, so lets add it to a jthread (auto closes on done) & continue on.
+        threads.emplace_back(std::jthread{&handle_connection, connfd, client.sin_addr.s_addr}, connfd);
+        
+    }
+
+    // connfd is closed within the loop
+    // for(auto & [th, connfd] : threads)
+    // {
+    //     close(connfd);
+    // }
+
 
     
     return 0;
