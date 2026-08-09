@@ -14,8 +14,16 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 
-SERVER_EXE = Path("sandbox/tcp-ping/server/sandbox_tcp_ping_server")
-CLIENT_EXE = Path("sandbox/tcp-ping/client/sandbox_tcp_ping_client")
+IMPLEMENTATIONS = ("dirtynet", "posix")
+
+
+def executable_paths(implementation: str) -> tuple[Path, Path]:
+    root = Path("sandbox/tcp-ping") / implementation
+    target_prefix = f"sandbox_tcp_ping_{implementation}"
+    return (
+        root / "server" / f"{target_prefix}_server",
+        root / "client" / f"{target_prefix}_client",
+    )
 
 
 def default_build_dir() -> Path:
@@ -33,6 +41,11 @@ def default_build_dir() -> Path:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the TCP ping sandbox server and client."
+    )
+    parser.add_argument(
+        "implementation",
+        choices=IMPLEMENTATIONS,
+        help="TCP ping implementation to run.",
     )
     parser.add_argument(
         "--build-dir",
@@ -73,21 +86,25 @@ def stop_process(process: subprocess.Popen[bytes]) -> int:
 def main() -> int:
     args = parse_args()
     build_dir = args.build_dir.resolve()
+    server_exe, client_exe = executable_paths(args.implementation)
 
     try:
-        require_executable(build_dir, SERVER_EXE)
-        require_executable(build_dir, CLIENT_EXE)
+        require_executable(build_dir, server_exe)
+        require_executable(build_dir, client_exe)
     except (FileNotFoundError, PermissionError) as error:
         print(error, file=sys.stderr)
-        print("Build them first with: make tcp-ping", file=sys.stderr)
+        print(
+            f"Build them first with: make tcp-ping-{args.implementation}",
+            file=sys.stderr,
+        )
         return 1
 
     processes: list[tuple[str, subprocess.Popen[bytes]]] = []
     try:
-        server = subprocess.Popen([f"./{SERVER_EXE}"], cwd=build_dir)
+        server = subprocess.Popen([f"./{server_exe}"], cwd=build_dir)
         processes.append(("server", server))
 
-        client = subprocess.Popen([f"./{CLIENT_EXE}"], cwd=build_dir)
+        client = subprocess.Popen([f"./{client_exe}"], cwd=build_dir)
         processes.append(("client", client))
 
         time.sleep(args.check_delay)
