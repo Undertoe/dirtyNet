@@ -133,6 +133,38 @@ The object or adapter that satisfies the concept should own construction and
 decode rules. dirtyNet should provide the transport and efficient byte movement,
 then call the application-defined API at the boundary.
 
+### First Outbound Packet Requirement
+
+The first typed-I/O capability should allow an application-defined packet type
+to expose already encoded bytes for sending. Conceptually:
+
+```cpp
+template<class T>
+concept packet = requires(const T& value) {
+    { value.to_bytes() } -> byte_span_compatible;
+};
+```
+
+The exact concept and return-type names remain open. The important contract is
+that `to_bytes()` provides a read-only span of bytes whose lifetime covers the
+socket operation. Socket send/write overloads can accept such a value and
+delegate to the same fundamental byte-oriented operation:
+
+```cpp
+socket.send_to(destination, packet_value);
+connection.write(packet_value);
+```
+
+This is an opt-in convenience overload, not a replacement transport path and
+not a dirtyNet-owned packet format. The application still owns encoding,
+field layout, byte order, framing, and packet meaning.
+
+The packet concept is outbound-only. dirtyNet does not commit to
+`receive<T>()`, `read<T>()`, or automatic application-packet construction.
+Receive operations continue to return transport-native bytes and metadata.
+Applications or optional layers above dirtyNet own construction, incomplete
+input, malformed input, and—for TCP—stream framing.
+
 ## Optional Sample Packet Helpers
 
 It may be useful to provide a lightweight templated sample packet or framed
