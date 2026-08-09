@@ -1,4 +1,5 @@
 add_subdirectory(tcp-ping)
 add_subdirectory(tcp-packet)
+add_subdirectory(tcp-multi)
 add_subdirectory(udp-ping)
 add_subdirectory(udp-many)
