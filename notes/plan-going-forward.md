@@ -4,8 +4,10 @@
 
 - Keep the old implementation in `archive/legacy-dirtynet/` as a read-only reference.
 - Use the new `.devcontainer/` as the cross-platform Linux development environment for Windows, macOS Intel, and macOS Apple Silicon hosts.
-- Decide the new active project layout before introducing fresh C++ source files.
-- Create a modern root build setup once the target layout is chosen.
+- Use the selected `lib/dirtynet/*.hh`, `exec/`, and `tests/` primary project
+  layout for the new implementation.
+- Convert the library target to a header-only CMake `INTERFACE` target when the
+  implementation phase begins.
 - Complete the revision 0 design pass in `notes/rev0-design.md` and
   `notes/rev0-design-questions.md` before promoting the proposed API into code.
 
@@ -29,12 +31,16 @@
   isolate native endpoints, socket handles, and errors for future Windows work.
 - Start the address foundation with port and IP value types that reduce byte-order
   and IPv4/IPv6 setup ceremony.
+- Follow the basic numeric IPv4/IPv6 pass with explicit hostname resolution
+  returning multiple endpoint candidates for uses such as market-data feeds.
 - Use distinct UDP and TCP public resource types rather than a generic public
   socket base; share native ownership internally where useful.
 - Treat event-driven callback usage as the preferred high-level workflow while
   retaining direct byte-oriented operations.
 - Use the UDP ping-pong sandbox to identify concrete boilerplate that should move behind endpoint and socket abstractions.
-- Choose the active source layout, likely separating public headers, implementation, tests, benchmarks, and examples.
+- Keep the supported public API in `lib/dirtynet/*.hh`, implementation headers
+  in `lib/dirtynet/detail/`, and the POSIX backend in
+  `lib/dirtynet/detail/posix/`.
 - Establish the baseline C++ standard, compiler warnings, sanitizers, and formatting expectations.
 - Add dependency handling for Catch2 and Google Benchmark in a way that works inside the devcontainer and on host builds.
 - Reintroduce tests around behavior first, using the archived tests as reference rather than blindly porting them.

@@ -35,8 +35,28 @@ The following high-level decisions reduce the open space in later sections:
 - UDP `receive()` returns an owning datagram containing bytes and sender.
 - UDP zero-byte datagrams are successful data, not EOF.
 - `on_receive()` data callbacks return exactly `void`.
-- `on_receive()` itself exposes strategy-dependent terminal completion/error
-  information.
+- The first synchronous UDP `on_receive()` handles one datagram and returns;
+  caller code owns repetition explicitly, such as with a `while` loop.
+- The preferred UDP ping/pong shape uses callback-based receive on the server
+  and direct blocking receive on the one-request/one-response client.
+- Packet-shaped outbound values may opt into socket send/write overloads by
+  exposing their encoded bytes; byte-oriented I/O remains the foundation.
+- The packet concept does not extend to typed receive/read operations; inbound
+  protocol decoding remains above dirtyNet.
+- Pass 0 includes basic numeric IPv4 and IPv6 value support.
+- Hostname resolution is an explicit early follow-up capability rather than an
+  IP constructor behavior. It returns multiple endpoint candidates for caller
+  or connection-attempt policy to consider.
+- Public address/resource values do not have an observable invalid state.
+  Fallible or untrusted construction boundaries use expected-returning factory
+  functions; already-valid address values may compose through ordinary
+  constructors.
+- An endpoint can be constructed directly from a valid IP value and port.
+  Endpoints reported by socket operations are validated while converting from
+  native address data, so the resulting public endpoint is valid.
+- IP values store an already-parsed binary address through the native backend
+  seam. An endpoint stores its semantic `ip + port` values and eagerly prepares
+  the complete native endpoint representation used by socket calls.
 - Socket-owning resources expose permanent, idempotent `kill() noexcept`
   semantics; killed resources cannot be reused.
 - Revision 0 starts primarily header-only while isolating native backend details
@@ -136,7 +156,8 @@ Pressures:
 
 ### Questions To Answer Next
 
-1. Does synchronous `on_receive()` block on the calling thread until stopped?
+1. Should a later synchronous repeated-receive operation have a distinct name,
+   or should `on_receive()` eventually grow that behavior?
 2. Does asynchronous `on_receive()` return immediately?
 3. Does dirtyNet create threads by default, or must callers provide a context?
 4. May two callbacks for one socket or connection execute concurrently?
@@ -579,6 +600,32 @@ Open questions:
 - Does `local_endpoint()` force discovery of an OS-selected endpoint?
 - Is explicit binding required for the preferred receive path?
 
+### First Synchronous Callback Shape
+
+For the first UDP slice, `on_receive(callback)` is a one-shot blocking
+operation. It receives one datagram, invokes the callback exactly once on the
+calling thread, and then returns completion or error information. The
+application owns repetition explicitly:
+
+```cpp
+while (running) {
+    auto result = server.on_receive([&server](auto datagram) {
+        server.send_to(datagram.sender, pong);
+    });
+
+    if (!result) {
+        break;
+    }
+}
+```
+
+The one-request/one-response client does not need a callback. It sends directly
+and then calls the direct blocking UDP receive operation once.
+
+This deliberately postpones stop tokens, operation handles, and cross-thread
+cancellation. A later repeated-receive convenience may be added after those
+lifetime contracts are designed.
+
 ### Receive Results
 
 Questions:
@@ -630,15 +677,20 @@ Complete usage examples should still verify argument ordering and whether the
 
 ## Priority 9: Define Hostname Resolution Boundaries
 
-The current endpoint idea allows hostname-backed resolution while explicit
-`ipv4` and `ipv6` construction parses numeric addresses.
+Explicit `ipv4` and `ipv6` construction parses numeric addresses. Hostnames
+such as `feed.example.com` use a separate, fallible resolution operation.
+
+Resolution is required early for the intended market-data proof of concept,
+but it does not need to be part of the first basic address/UDP implementation
+pass. A successful resolution returns all usable endpoint candidates rather
+than silently selecting the OS resolver's first result. Candidate ordering may
+still follow the resolver, while connection-attempt and fallback policy belongs
+to the caller, a transport connection operation, or a later helper.
 
 Questions:
 
-- Because resolution can fail, should hostname construction be a factory rather
-  than an endpoint constructor?
+- What should the resolver facade and result collection be named?
 - Should a distinct `hostname` type prevent confusion with numeric literals?
-- Is selecting the OS resolver's first result sufficient for all rev0 uses?
 - How is blocking DNS behavior communicated when used with an async strategy?
 - Does connection fallback belong to resolution, TCP connect, or a higher layer?
 - How are native resolver errors represented?
@@ -646,12 +698,12 @@ Questions:
 Potential expected-based shape:
 
 ```cpp
-std::expected<endpoint, resolve_error>
-endpoint::resolve(std::string_view hostname, port service_port);
+std::expected<std::vector<endpoint>, resolve_error>
+resolve(std::string_view hostname, port service_port);
 ```
 
-This is less constructor-like than the original concept but aligns with the
-factory/error direction selected for socket resources.
+The exact facade and collection type remain open. The important boundary is
+that resolution is explicit, fallible, and potentially one-to-many.
 
 ## Priority 10: Define Endpoint Native Access
 
@@ -662,11 +714,24 @@ Questions:
 
 - Is `endpoint::native()` public interoperability API or backend-only access?
 - Does it return a view, pointer-length pair, or named native wrapper?
-- Does endpoint eagerly build its native representation on construction?
 - Does `from_native` validate unsupported families and lengths through
   `std::expected`?
-- Is native endpoint storage duplicated alongside semantic `ip + port`?
 - Are endpoint objects immutable after construction?
+
+Current representation decision:
+
+```text
+endpoint
+|-- ip
+|   `-- already-parsed binary address
+|-- port
+`-- eagerly prepared native endpoint storage + length
+```
+
+The concrete binary/native types may be POSIX `in_addr`, `in6_addr`, and
+socket-address structures in the first backend, with Windows equivalents later.
+Those types do not become the platform-neutral public identity of an address or
+endpoint.
 
 Performance intent:
 
@@ -676,6 +741,11 @@ Performance intent:
   endpoints are primarily setup and reporting values there.
 
 ## Priority 11: Define Error Type Granularity
+
+Detailed error taxonomy is deferred until after the first address and native
+endpoint implementation pass. The first pass may use a small provisional result
+shape so implementation evidence can guide later distinctions. Those initial
+error names and categories are not considered stable public API commitments.
 
 Questions:
 
@@ -804,6 +874,12 @@ error the native syscall happens to produce.
 
 Before implementation, explicitly approve a minimal capability table.
 
+The approved first implementation pass is intentionally narrower than the full
+candidate revision 0 table: basic IPv4 and IPv6 values, `ip`, `port`, endpoint
+composition, and the POSIX native endpoint seam. Blocking UDP follows after
+that foundation. Detailed portable error taxonomy may be revised after this
+first implementation evidence exists.
+
 Candidate baseline:
 
 | Area | Candidate revision 0 capability |
@@ -811,7 +887,7 @@ Candidate baseline:
 | Address | port, IPv4, IPv6, IP variant, endpoint |
 | Native boundary | POSIX endpoint conversion and RAII socket handle |
 | UDP direct | open, bind, send-to, receive-from |
-| UDP events | repeated receive callback |
+| UDP callback | one-shot blocking receive callback; caller owns repetition |
 | TCP server direct | bind/listen factory and accept |
 | TCP client direct | connect factory |
 | TCP connection direct | read-some and write-some/all contract |
@@ -834,15 +910,12 @@ Items to explicitly approve or defer:
 
 ## Recommended Next Conversation Order
 
-1. Produce and approve a concise provisional UDP API sheet from the decisions
-   already recorded.
-2. Finalize the header-only source/file layout and CMake `INTERFACE` target.
-3. Define the minimum portable error values needed by address construction and
-   blocking UDP factories/I/O.
-4. Approve the first implementation slice: address foundation plus blocking
-   caller-owned UDP bind/send/receive.
-5. Decide the implementation branch workflow after the documentation branch is
-   reviewed or merged.
+1. Review and finish the documentation-only design branch.
+2. Begin the approved address-foundation and POSIX native-endpoint pass using
+   `notes/working-todos.md`.
+3. Revisit portable error values with evidence from that implementation.
+4. Approve and implement blocking caller-owned UDP bind/send/receive.
+5. Validate the direct and one-shot callback paths with UDP ping/pong.
 6. Defer detailed async operation handles, polling, and thread mechanics until
    blocking UDP behavior supplies implementation evidence.
 

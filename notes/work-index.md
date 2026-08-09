@@ -4,9 +4,9 @@ Use this file to quickly answer: "What is the next work we should look at?"
 
 ## Quick Answer
 
-Next work: produce a concise provisional UDP API sheet, finalize the header-only
-source layout, and define the minimum portable errors required for the first
-blocking UDP implementation slice.
+Next work: begin the approved address-foundation implementation pass with basic
+IPv4 and IPv6 values, `ip`, `port`, endpoint composition, and the POSIX native
+endpoint seam.
 
 Primary design reference: `notes/rev0-design.md`.
 
@@ -43,17 +43,18 @@ Current UDP learning notes: `notes/udp-pingpong-library-notes.md`.
 
 ## Ordered Task Queue
 
-1. Produce and approve a concise provisional UDP API sheet.
-2. Finalize the header-only `include/dirtynet/` layout and CMake `INTERFACE`
-   target shape.
-3. Define minimum portable error/result values for address construction and
-   blocking UDP factories and I/O.
-4. Approve the first implementation capability slice.
+1. Use `notes/working-todos.md` as the high-level implementation checklist.
+2. Use the approved header-only `lib/dirtynet/*.hh` layout and CMake
+   `INTERFACE` target shape when implementation begins.
+3. Revisit portable error/result granularity after the first implementation
+   pass provides concrete evidence.
+4. Use the approved first implementation pass: address values, endpoint
+   composition, and the POSIX native endpoint seam.
 5. Finish and review the documentation-only `rev0_design` branch.
 6. Create a separate implementation branch after the documentation workflow is
    resolved.
-7. Implement the address foundation and native endpoint seam after Terry gives
-   explicit approval for that C++ work.
+7. Implement the approved address foundation and native endpoint seam after
+   Terry gives explicit approval for that specific C++ work.
 8. Implement blocking caller-owned UDP bind, send, and receive behavior.
 9. Validate the slice with UDP ping/pong.
 10. Return to callback and async mechanics with implementation evidence.

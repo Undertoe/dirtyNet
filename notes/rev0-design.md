@@ -114,6 +114,12 @@ Application framing and packet meaning remain above the core transport layer.
 dirtyNet may eventually provide optional framing or typed-I/O helpers, but its
 source of truth is byte-oriented I/O.
 
+The first packet customization is deliberately outbound-only. An
+application-defined value may expose encoded bytes for send/write convenience,
+but dirtyNet does not infer a corresponding typed receive operation. Inbound
+operations return transport-native bytes and metadata for application or
+protocol-layer decoding.
+
 ## Address Foundation
 
 ### `port`
@@ -142,8 +148,8 @@ representations.
 Conceptual facilities include:
 
 ```cpp
-ipv4{"127.0.0.1"};
-ipv6{"::1"};
+auto v4 = ipv4::from_string("127.0.0.1");
+auto v6 = ipv6::from_string("::1");
 
 ipv4::localhost();
 ipv6::localhost();
@@ -156,6 +162,8 @@ For revision 0:
 
 - Text construction parses immediately into binary representation.
 - The binary address is the value's identity.
+- Construction writes directly into the backend's appropriate binary address
+  representation; it does not retain or repeatedly reparse presentation text.
 - `string()` formats the binary address on demand.
 - The originally supplied string is not retained.
 - No lazy string cache or mutex is required.
@@ -224,32 +232,44 @@ remote-endpoint reporting, and sender reporting.
 Numeric construction remains explicit about address family:
 
 ```cpp
-endpoint{ipv4{"127.0.0.1"}, port{8080}};
-endpoint{ipv6{"::1"}, port{8080}};
+endpoint{valid_ipv4, port{8080}};
+endpoint{valid_ipv6, port{8080}};
 endpoint{ip::localhost(), port{8080}};
 ```
+
+`from_string` is a conceptual factory name here; exact factory naming remains
+an implementation-pass decision.
 
 The concrete-family overloads are conveniences that wrap their input in `ip`;
 the endpoint's platform-neutral semantic address remains `ip + port`.
 
-An endpoint string construction path may perform operating-system name
-resolution:
+Public address values do not carry an observable invalid state. Fallible input
+boundaries, such as parsing numeric text, use expected-returning named factory
+functions. Once an IP value and port are valid, composing them into an endpoint
+is infallible and may use an ordinary constructor. This keeps factories at
+boundaries that can actually fail rather than requiring them for every value
+composition.
+
+Hostname resolution is separate from endpoint construction:
 
 ```cpp
-endpoint{"example.com", port{443}};
+auto candidates = resolve("feed.example.com", port{443});
 ```
 
-The revision 0 resolution rule is intentionally simple:
+The current resolution boundary is:
 
 - Treat explicit `ipv4` and `ipv6` construction as numeric parsing.
-- Treat the endpoint hostname path as OS-backed resolution.
-- Select the first address returned by the OS resolver.
-- Store the resolved binary `ip` and `port`, not the hostname.
-- Do not promise identical address-family selection across systems because OS
-  resolver order and local configuration can differ.
+- Use an explicit, fallible OS-backed operation for hostname resolution.
+- Return multiple usable endpoint candidates rather than silently choosing the
+  first resolver result.
+- Preserve resolver ordering without promising identical ordering or address
+  families across systems.
+- Keep connection-attempt and fallback policy outside the basic address values.
 
-The precise fallible construction shape for hostname resolution remains open,
-especially because constructors cannot return `std::expected`.
+Basic numeric IPv4 and IPv6 values belong to pass 0. Hostname resolution is an
+early follow-up required by the intended market-data proof of concept, not a
+requirement for the first blocking UDP implementation slice. Its exact facade,
+result collection, and error type remain open.
 
 ### Native Endpoint Representation
 
@@ -273,6 +293,11 @@ ready representation. On POSIX, the implementation can wrap address storage
 and its associated length. Windows revision 1 can replace the internals while
 preserving the high-level endpoint contract.
 
+This is the selected representation direction: `ip + port` remain the
+platform-neutral semantic values, while the eager native endpoint is the fast
+socket-call representation. Constructing from an already-valid IP and port
+does not parse, resolve, allocate, or defer native endpoint preparation.
+
 The inverse path is also required:
 
 ```text
@@ -285,8 +310,12 @@ endpoint::from_native(native_endpoint)
 ordinary ip + port endpoint
 ```
 
-Revision 0 only needs a centralized `native_endpoint` seam. Exact view/storage
-types, mutability, and public visibility can be refined during implementation.
+Native address data returned by socket operations is validated at this inverse
+boundary before a public endpoint is produced. Callers can therefore assume
+that a returned endpoint is valid rather than checking a separate validity
+flag. Revision 0 only needs a centralized `native_endpoint` seam. Exact
+view/storage types, mutability, and public visibility can be refined during
+implementation.
 
 ## Native Socket Ownership
 
@@ -492,31 +521,37 @@ Returning the successful send byte count intentionally preserves evidence for
 application protocol code. A zero-length UDP datagram remains a successful
 receive with an empty byte vector; UDP has no TCP-style EOF.
 
-The preferred event-driven operation conceptually resembles:
+The first synchronous callback operation conceptually resembles:
 
 ```cpp
-socket.on_receive([](udp_datagram datagram) -> void {
-    process(std::move(datagram));
-});
+while (running) {
+    auto result = socket.on_receive([](udp_datagram datagram) -> void {
+        process(std::move(datagram));
+    });
+
+    if (!result) {
+        break;
+    }
+}
 ```
 
-The callback must return exactly `void` for revision 0. It handles one successful
-datagram and does not control loop continuation through a return value. The
-`on_receive()` call has a strategy-dependent result:
+The callback must return exactly `void` for revision 0. A synchronous
+`on_receive()` blocks until it receives one datagram, invokes the callback once
+on the calling thread, and then returns completion or error information. Caller
+code owns repetition explicitly. This keeps the first callback layer usable
+without first designing stop tokens, operation handles, or cross-thread
+cancellation.
 
-```text
-sync
-    blocks, invokes callbacks sequentially on the calling thread,
-    and directly returns terminal completion/error information
+A one-request/one-response UDP client can instead use `send_to()` followed by
+one direct blocking `receive()` call; callback registration is not required.
 
-async
-    returns a future-like operation whose eventual result contains
-    equivalent terminal completion/error information
-```
+A later async or repeated-receive operation will need its own lifetime and
+terminal-result contract. Fine-grained operation types and threading
+mechanisms remain deferred.
 
-Fine-grained operation types and threading mechanisms are deferred. A connected
-UDP type may eventually deserve a separate capability model because native UDP
-connect changes peer filtering and permits destination-free send/receive calls.
+A connected UDP type may eventually deserve a separate capability model
+because native UDP connect changes peer filtering and permits destination-free
+send/receive calls.
 
 ## TCP Resource Model
 
@@ -638,7 +673,7 @@ tcp_connection.on_receive(stream_callback);
 tcp_connection_handler.on_connection(connection_callback);
 ```
 
-The event-driven machinery conceptually performs:
+Later long-running event machinery conceptually performs:
 
 ```text
 wait for readiness or completion
@@ -672,9 +707,11 @@ The event API should be implemented from the same transport contracts, error
 model, and native ownership rules. It should not become a behaviorally separate
 socket system.
 
-Event data callbacks return exactly `void`. Receive-loop completion and errors
-belong to the strategy-dependent result of `on_receive()`, not to each
-successful-data callback.
+Event data callbacks return exactly `void`. In the first synchronous UDP slice,
+each `on_receive()` invocation completes after one callback and returns its own
+error information. A future long-running receive operation will need to expose
+loop completion and terminal errors through its strategy-dependent result, not
+through each successful-data callback.
 
 ## Resource Termination
 
@@ -733,7 +770,7 @@ experiments demonstrate an immediate need:
 - Canonical/compressed IP string policy
 - Connected UDP public type
 - Multicast membership API
-- DNS result collections, preference, and fallback policies
+- Advanced DNS preference and connection-fallback policies
 - TLS
 - HTTP
 - Application packet schemas
@@ -760,37 +797,75 @@ dirtynet::detail::native_socket
 dirtynet::detail::native_endpoint
 ```
 
-The first build target can be a CMake `INTERFACE` library. Native wrappers can
-be defined inline for revision 0 and moved into compiled source files later
-without changing the public responsibility model.
+The first build target is a CMake `INTERFACE` library. Native wrappers can be
+defined inline for revision 0 and moved into compiled source files later without
+changing the public responsibility model.
 
-A provisional layout is:
+The selected primary project layout is:
 
 ```text
-include/dirtynet/
-|-- dirtynet.hpp
-|-- endpoint.hpp
-|-- ip.hpp
-|-- port.hpp
-|-- udp.hpp
-|-- strategy/
-|-- storage/
-`-- detail/
-    |-- native_endpoint.hpp
-    |-- native_socket.hpp
-    `-- posix/
+lib/
+|-- CMakeLists.txt
+`-- dirtynet/
+    |-- dirtynet.hh
+    |-- endpoint.hh
+    |-- ip.hh
+    |-- port.hh
+    |-- udp.hh
+    |-- strategy/
+    |-- storage/
+    `-- detail/
+        |-- native_endpoint.hh
+        |-- native_socket.hh
+        `-- posix/
 
 tests/
+|-- CMakeLists.txt
 |-- address/
 |-- udp/
 `-- integration/
+
+exec/
+`-- CMakeLists.txt
 
 sandbox/
 `-- udp-pingpong/
     `-- readme.md
 ```
 
-The exact file granularity remains open. Every sandbox subproject must retain a
+The exported build-tree include root is `lib/`, giving consumers includes such
+as:
+
+```cpp
+#include <dirtynet/dirtynet.hh>
+#include <dirtynet/endpoint.hh>
+```
+
+The `dirtynet/` top layer is the supported public API. Headers beneath
+`dirtynet/detail/` are reachable because revision 0 is header-only, but remain
+unsupported implementation details. Platform-specific code is further isolated
+beneath `dirtynet/detail/posix/` for the first backend.
+
+The target shape is conceptually:
+
+```cmake
+add_library(dirtynet INTERFACE)
+add_library(dirtyNet::dirtynet ALIAS dirtynet)
+
+target_include_directories(dirtynet
+    INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+)
+
+target_compile_features(dirtynet INTERFACE cxx_std_23)
+```
+
+Warnings, sanitizers, test dependencies, and benchmark dependencies remain
+project-side configuration and are not forced onto external consumers through
+the interface target.
+
+The exact file granularity inside `strategy/`, `storage/`, and `detail/` may
+evolve with implementation evidence. Every sandbox subproject must retain a
 short `readme.md` with strict exercise goals.
 
 ## Revision 0 Success Shape
