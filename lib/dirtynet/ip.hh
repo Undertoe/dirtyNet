@@ -32,16 +32,6 @@ struct port_native_access;
         // friend struct ipv6_native_access;
     };
 
-    class port
-    {
-    public:
-
-    private:
-        detail::native::port _native;
-        
-        friend struct detail::port_native_access;
-    };
-
 
     class ip
     {

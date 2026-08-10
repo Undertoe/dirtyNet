@@ -2,6 +2,7 @@ BUILD_DIR ?= build
 CMAKE ?= cmake
 BUILD_TYPE ?= Debug
 CMAKE_ARGS ?=
+TEST ?=
 
 .PHONY: help configure build test tests benchmark perf exec sandbox udp-ping udp-ping-posix udp-ping-dirtynet udp-many udp-many-posix udp-many-dirtynet tcp-ping tcp-ping-posix tcp-ping-dirtynet tpc-ping tcp-packet tcp-packet-posix tcp-packet-dirtynet all clean
 
@@ -9,7 +10,8 @@ help:
 	@echo "Targets:"
 	@echo "  make configure  Configure the CMake build tree"
 	@echo "  make build      Build all default targets"
-	@echo "  make tests      Build and run tests"
+	@echo "  make tests      Build and run all tests"
+	@echo "  make tests TEST=<filter>  Build and run matching Catch2 tests"
 	@echo "  make test       Alias for tests"
 	@echo "  make benchmark  Build and run benchmarks"
 	@echo "  make exec       Build the maintained executable"
@@ -37,7 +39,11 @@ build: configure
 
 tests: configure
 	$(CMAKE) --build $(BUILD_DIR) --target dirtynet_tests
-	ctest --test-dir $(BUILD_DIR) --output-on-failure
+	@if [ -n "$(TEST)" ]; then \
+		./$(BUILD_DIR)/tests/dirtynet_tests "$(TEST)"; \
+	else \
+		ctest --test-dir $(BUILD_DIR) --output-on-failure; \
+	fi
 
 test: tests
 

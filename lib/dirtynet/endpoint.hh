@@ -17,7 +17,7 @@ struct endpoint_native_access;
 class endpoint
 {
 public:
-    endpoint(const ip& i, const port& p) : _native(ip_native_access::get(i), p._storage)
+    endpoint(const ip& i, const port& p) : _native(detail::ip_native_access::get(i), p._storage)
     {
 
     }

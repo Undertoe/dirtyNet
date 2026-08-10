@@ -13,10 +13,6 @@ namespace dirtynet::detail::posix {
 
     };
 
-    class port{
-
-    };
-
 
     class ip // not sure if needed?
     {
