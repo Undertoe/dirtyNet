@@ -58,6 +58,19 @@ parameter lists, result types, or factory names.
 - Add internal conversion from validated native endpoint data.
 - Provide equality and ordinary value-type behavior.
 
+### Next Step: Endpoint Construction
+
+Handle all four construction inputs during revision 0:
+
+- Validated native endpoint data.
+- Numeric IP strings.
+- Port values, including the intended integer and string forms.
+- URL or hostname lookup through a fallible resolution path.
+
+Keep the exact URL/hostname resolution boundary separate from numeric IP
+parsing while deciding how its resulting endpoint candidates enter the public
+API.
+
 ## Native Endpoint Layer
 
 - Define shared `native_endpoint` storage and length handling.

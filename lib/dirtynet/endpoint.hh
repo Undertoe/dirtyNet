@@ -3,7 +3,7 @@
 #include <optional>
 #include <string>
 
-#include <dirtynet/ip.hh>
+#include "ip.hh"
 #include "detail/native_endpoint.hh"
 
 namespace dirtynet {
@@ -17,7 +17,10 @@ struct endpoint_native_access;
 class endpoint
 {
 public:
-    // endpoint();
+    endpoint(const ip& i, const port& p) : _native(ip_native_access::get(i), p._storage)
+    {
+
+    }
 
     std::string to_string() const
     {
@@ -29,10 +32,14 @@ public:
     }
 
 private:
+
+    endpoint(detail::native::endpoint native) : _native(std::move(native)) {}
+
     detail::native::endpoint _native;
     mutable std::optional<std::string> _strCache;
 
     friend struct detail::endpoint_native_access;
+    friend struct ip;
 };
 
 
@@ -43,6 +50,12 @@ struct endpoint_native_access
     static const native::endpoint& get(const dirtynet::endpoint& val) noexcept
     {
         return val._native;
+    }
+
+
+    static dirtynet::endpoint from_native(const detail::native::endpoint native)
+    {   
+        return endpoint(native);
     }
 };
 }

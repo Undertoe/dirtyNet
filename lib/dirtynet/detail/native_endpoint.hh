@@ -9,6 +9,8 @@
 
 namespace dirtynet::detail::native {
 using endpoint = posix::endpoint;
+using endpoint_error = posix::endpoint_error;
+using posix::endpoint_error_string;
 }
 
 #endif

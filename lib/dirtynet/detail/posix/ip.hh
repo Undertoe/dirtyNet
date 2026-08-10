@@ -4,22 +4,23 @@ namespace dirtynet::detail::posix {
 
 // POSIX IP conversion support will be introduced here during the IP pass.
 
-    struct ipv4
+    class ipv4
     {
 
     };
 
-    struct ipv6{
+    class ipv6{
 
     };
 
-    struct port{
+    class port{
 
     };
 
 
-    struct ip
+    class ip // not sure if needed?
     {
+        
 
     };
 
