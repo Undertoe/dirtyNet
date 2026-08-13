@@ -4,28 +4,30 @@ Use this file to quickly answer: "What is the next work we should look at?"
 
 ## Quick Answer
 
-Next work: begin the approved address-foundation implementation pass with basic
-IPv4 and IPv6 values, `ip`, `port`, endpoint composition, and the POSIX native
-endpoint seam.
+Next work: complete Step 0, the smallest IPv4-only dirtyNet UDP vertical slice:
+`port` and `ipv4`, `ipv4` into `ip`, `ip + port` into `endpoint`, the POSIX
+native endpoint seam, a baseline blocking UDP socket, and dirtyNet UDP
+ping/pong.
 
 Primary design reference: `notes/rev0-design.md`.
 
 Detailed decision queue: `notes/rev0-design-questions.md`.
 
-This work stream is documentation-only. Do not edit C++ source, headers,
-benchmarks, or tests until Terry explicitly asks for the specific C++ work.
+Implementation is active on `project-setup-ip`. Continue to require Terry's
+explicit request before editing specific C++ sources, headers, benchmarks, or
+tests.
 
 ## Current Work Stream
 
-Revision 0 system and public API design.
+Step 0 proof-of-concept implementation.
 
-Goal: establish responsibility, ownership, event, error, and portability
-contracts before implementation begins.
+Goal: prove the smallest end-to-end dirtyNet path with IPv4 UDP ping/pong, then
+use that working path to choose socket-I/O defaults and options for the MVP.
 
-Current design branch: `rev0_design`.
+Current implementation branch: `project-setup-ip`.
 
-After the design scope is approved, return to baseline Linux socket behavior as
-the implementation feedback loop.
+The revision 0 design is approved and merged. Baseline Linux socket behavior
+and the existing UDP sandbox remain the implementation feedback loop.
 
 ## Prior Implementation Learning Stream
 
@@ -46,18 +48,16 @@ Current UDP learning notes: `notes/udp-pingpong-library-notes.md`.
 1. Use `notes/working-todos.md` as the high-level implementation checklist.
 2. Use the approved header-only `lib/dirtynet/*.hh` layout and CMake
    `INTERFACE` target shape when implementation begins.
-3. Revisit portable error/result granularity after the first implementation
-   pass provides concrete evidence.
-4. Use the approved first implementation pass: address values, endpoint
-   composition, and the POSIX native endpoint seam.
-5. Finish and review the documentation-only `rev0_design` branch.
-6. Create a separate implementation branch after the documentation workflow is
-   resolved.
-7. Implement the approved address foundation and native endpoint seam after
-   Terry gives explicit approval for that specific C++ work.
-8. Implement blocking caller-owned UDP bind, send, and receive behavior.
-9. Validate the slice with UDP ping/pong.
-10. Return to callback and async mechanics with implementation evidence.
+3. Complete the IPv4-only Step 0 vertical slice described in
+   `notes/working-todos.md`.
+4. Validate Step 0 with dirtyNet UDP ping/pong.
+5. Use Step 0 evidence to define baseline socket-I/O defaults and explicit
+   options.
+6. Complete IPv6 through the established address, endpoint, and UDP seams.
+7. Revisit portable error/result granularity with implementation evidence.
+8. Add the remaining capabilities required for the exchange-facing MVP.
+9. Return to callback and async mechanics after the blocking contracts are
+   proven.
 
 ## Follow-On Questions
 
