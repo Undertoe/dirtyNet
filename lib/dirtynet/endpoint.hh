@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 
+#include "dirtynet/port.hh"
 #include "ip.hh"
 #include "detail/native_endpoint.hh"
 
@@ -17,7 +18,7 @@ struct endpoint_native_access;
 class endpoint
 {
 public:
-    endpoint(const ip& i, const port& p) : _native(detail::ip_native_access::get(i), p._storage)
+    endpoint(const ip& i, const port& p) : _native(detail::ip_native_access::get(i), detail::port_native_access::get(p))
     {
 
     }

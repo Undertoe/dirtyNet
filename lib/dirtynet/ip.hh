@@ -5,88 +5,51 @@
 #include <string>
 
 #include "dirtynet/detail/native_ip.hh"
-#include <netinet/in.h>
-#include <dirtynet/error/ipv4.hh>
+#include "dirtynet/port.hh"
+#include <dirtynet/error/ip.hh>
 namespace dirtynet {
-
-// ip types that will be used for construction of our lower level ip values.
 
 // forward declare our access helpers 
 namespace detail {
-struct ipv4_native_access;
 struct ip_native_access;
 }
-
-class ipv4
-{
-public:
-
-
-    static std::expected<ipv4, ipv4_parse_error> from_ip_string(std::string_view sv)
-    {
-        auto native = detail::native::ipv4::from_ip_string(sv);
-        if(native.has_value())
-        {
-            return ipv4(native.value());
-        }
-        return std::unexpected<ipv4_parse_error>(native.error());
-    }    
-
-    constexpr static ipv4 localhost() 
-    {   
-        return ipv4(detail::native::ipv4::localhost());
-    }
-
-    std::string to_string() const
-    {
-        if(!_strCache)
-        {
-            _strCache = _native.to_string();
-        }
-        return *_strCache;
-    }
-
-
-    bool operator==(const ipv4& other) const
-    {
-        return _native == other._native;
-    }
-
-
-    std::strong_ordering operator <=> (const ipv4& other)
-    {
-        return _native <=> other._native;
-    }
-
-private:
-
-    ipv4(const detail::native::ipv4 ip) : _native(ip) {}
-
-    detail::native::ipv4 _native;
-    mutable std::optional<std::string> _strCache;
-
-    friend struct detail::ipv4_native_access;
-};
-
-
-class ipv6
-{
-public:
-
-private:
-    detail::native::ipv6 _native;
-
-    // friend struct ipv6_native_access;
-};
 
 
 class ip
 {
 public:
+
+
+    static std::expected<ip, ip_parse_error> from_ipv4_string(std::string_view sv)
+    {
+        auto m_ipv4 = detail::native::ip::from_ipv4_string(sv);
+        if(!m_ipv4)
+        {
+            return std::unexpected<ip_parse_error>{m_ipv4.error()};
+        }
+        return ip(*m_ipv4);
+    }
+
+
+    static constexpr ip localhost()
+    {
+        return ip(detail::native::ip::localhost());
+    }
     
+
+    bool operator==(const ip& other) const
+    {
+        return other._native == _native;
+    }
     
+    std::string to_string() const 
+    {
+        return _native.to_string();
+    }
+
 private:
-    // ip(detail::native::ip native) : _native(std::move(native)) {}
+    ip(const detail::native::ip& native) : _native(native) {}
+    ip(detail::native::ip&& native) : _native(std::move(native)) {}
     
     detail::native::ip _native;
 
@@ -96,19 +59,6 @@ private:
     
 namespace detail {
 
-    struct ipv4_native_access 
-    {
-        static const native::ipv4& get(const dirtynet::ipv4& val) noexcept
-        {
-            return val._native;
-        }
-
-        static dirtynet::ipv4 from_native(detail::native::ipv4_internal internal)
-        {
-            return dirtynet::ipv4(native::ipv4::from_native(internal));
-        }
-    };
-
     // need to implement the ip_native_access & add friend access to the important types
     struct ip_native_access
     {
@@ -116,6 +66,13 @@ namespace detail {
         {
             return val._native;
         }
+
+        static dirtynet::ip from_native(detail::native::ipv4::internal_t internal)
+        {
+            return dirtynet::ip(detail::native::ip{internal});
+        }
+
+
 
         // static dirtynet::ip from_native(const detail::native::ip native)
         // {

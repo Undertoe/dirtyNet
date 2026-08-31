@@ -40,8 +40,10 @@ build: configure
 tests: configure
 	$(CMAKE) --build $(BUILD_DIR) --target dirtynet_tests
 	@if [ -n "$(TEST)" ]; then \
+		./$(BUILD_DIR)/tests/dirtynet_tests "$(TEST)" --list-tests; \
 		./$(BUILD_DIR)/tests/dirtynet_tests "$(TEST)"; \
 	else \
+		./$(BUILD_DIR)/tests/dirtynet_tests --list-tests; \
 		ctest --test-dir $(BUILD_DIR) --output-on-failure; \
 	fi
 

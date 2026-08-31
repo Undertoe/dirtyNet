@@ -15,5 +15,7 @@ namespace dirtynet::detail::native {
     using ip = posix::ip;
 }
 
+#else
+#error "You are trying to build with dirtynet on an unsupported platform"
 
 #endif

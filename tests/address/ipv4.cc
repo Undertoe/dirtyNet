@@ -1,4 +1,5 @@
-#include "dirtynet/error/ipv4.hh"
+#include <catch2/interfaces/catch_interfaces_registry_hub.hpp>
+#include <dirtynet/error/ip.hh>
 #include <catch2/catch_test_macros.hpp>
 
 
@@ -6,18 +7,19 @@
 #include <expected>
 
 
-TEST_CASE("ipv4")
-{
-    {
-        auto test_ip = dirtynet::ipv4::localhost();
-        REQUIRE(test_ip.to_string() == "127.0.0.1");
-        
 
-        auto test_two = dirtynet::ipv4::from_ip_string("127.0.0.1");
-        REQUIRE(test_two == test_ip);
+TEST_CASE("ip")
+{
+    // building from ipv4
+    {
+        auto localhost_1 = dirtynet::ip::from_ipv4_string("127.0.0.1");
+        auto localhost_2 = dirtynet::ip::localhost();
+        REQUIRE(localhost_1 == localhost_2);
     }
     {
-        auto test_bad = dirtynet::ipv4::from_ip_string("1:0:0:1");
-        REQUIRE(test_bad == std::unexpected<ipv4_parse_error>{ipv4_parse_error::invalid_address});
+        auto test_bad = dirtynet::ip::from_ipv4_string("1:0:0:1");
+        REQUIRE(test_bad == std::unexpected<dirtynet::ip_parse_error>{dirtynet::ip_parse_error::invalid_address});
+        test_bad = dirtynet::ip::from_ipv4_string("257.0.0.1");
+        REQUIRE(test_bad == std::unexpected<dirtynet::ip_parse_error>{dirtynet::ip_parse_error::invalid_address});
     }
 }
