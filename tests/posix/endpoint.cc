@@ -41,7 +41,7 @@ TEST_CASE("dirtynet::detail::posix::endpoint", "native_ctr")
         REQUIRE(ip1 == ip2);
 
         auto p1 = ep.get_port();
-        auto p2 = ep.get_port();
+        auto p2 = otherEp.get_port();
         REQUIRE(p1 == p2);
 
         REQUIRE(ep == otherEp);

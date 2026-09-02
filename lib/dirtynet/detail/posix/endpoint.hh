@@ -87,6 +87,8 @@ public:
         {
             return ip{ipv6->sin6_addr};
         }
+        std::unreachable();
+        // return ip{};
     }
 
     port get_port() const 
@@ -99,6 +101,8 @@ public:
         {
             return port::from_native(ipv6->sin6_port);
         }
+        std::unreachable();
+        return port{0};
     }
 
     std::string to_string() const 
@@ -129,10 +133,7 @@ public:
     }
 
 private:
-
     std::variant<sockaddr_in, sockaddr_in6> _storage;
-    
-    
 };
 
 }

@@ -32,6 +32,11 @@ public:
         return *_strCache;
     }
 
+    bool operator==(const endpoint& other)
+    {
+        return _native == other._native;
+    }
+
 private:
 
     endpoint(detail::native::endpoint native) : _native(std::move(native)) {}

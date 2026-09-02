@@ -25,6 +25,12 @@ class ipv4
 public:
 
     using internal_t = in_addr;
+    static constexpr internal_t internal_any_address{ INADDR_ANY};
+
+    static constexpr ipv4 any() 
+    {
+        return ipv4{internal_any_address};
+    }
 
     constexpr ipv4(internal_t addr) : _addr(addr) { } 
 
@@ -69,29 +75,6 @@ public:
         auto res = inet_ntop(AF_INET, &_addr, buffer.data(), buffer.size());
         return std::string(res);
     }
-
-    // static std::expected<ipv4, ipv4_parse_error> hostlookup(std::string_view sv)
-    // {
-    //     return std::unexpected<ipv4_parse_error>{ipv4_parse_error::unknown_failure};
-    // }
-
-    // // this needs to be finished but we will handle that later
-    // static std::expected<std::vector<ipv4>, ipv4_parse_error> hostlookup_all(std::string_view sv)
-    // {
-    //     addrinfo info{.ai_family = AF_INET};
-    //     addrinfo* results{nullptr};
-    //     std::string hostname(sv);
-    //     int status = getaddrinfo(hostname.c_str(), nullptr, &info, &results);
-
-    //     if(status != 0)
-    //     {
-    //         return std::unexpected<ipv4_parse_error>{ipv4_parse_error::unknown_failure};
-    //     }
-
-
-    //     return {};
-    // }
-
 
 
     bool operator==(const ipv4& other) const
@@ -182,6 +165,11 @@ public:
         // do ipv6 stuff
 
         return std::unexpected<ip_parse_error>{ip_parse_error::invalid_address};
+    }
+
+    static constexpr ip any()
+    {
+        return ip{ipv4::any()};
     }
 
     static constexpr ip localhost()

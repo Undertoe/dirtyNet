@@ -35,6 +35,11 @@ public:
     {
         return ip(detail::native::ip::localhost());
     }
+
+    static constexpr ip any()
+    {
+        return ip{detail::native::ip::any()};
+    }
     
 
     bool operator==(const ip& other) const
