@@ -17,7 +17,13 @@ struct port_native_access;
 class port
 {
 public:
+
     port(uint16_t p) : _native(p) {}
+
+    static dirtynet::port from_native(const detail::native::port& p)
+    {
+        return dirtynet::port(p);
+    }
 
 
     std::string to_string() const
@@ -59,6 +65,8 @@ struct port_native_access
         // auto po = native::port::from_native(p);
         // return dirtynet::port(po);
     }
+
+    
 };
 }
 

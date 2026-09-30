@@ -40,10 +40,9 @@ public:
     {
         if(len == sockaddr_v4_l)
         {
-            endpoint ep;
-            auto& ipv4 = ep._storage.emplace<sockaddr_in>();
+            sockaddr_in ipv4;
             std::memcpy(&ipv4, addr, sockaddr_v4_l);
-            return ep;
+            return endpoint{ipv4};
         }
 
         return std::unexpected<endpoint_error>(endpoint_error::unsupported_address_type);
@@ -51,7 +50,8 @@ public:
         //  return the high level endpoint object later.
     }
 
-    endpoint() = default;
+
+    endpoint() = delete;
 
     // member initializer here will set our sockaddr type appropriately
     endpoint(ip ip, port p) 
