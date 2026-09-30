@@ -8,7 +8,7 @@ Current top-level layout:
 
 - `archive/legacy-dirtynet/` - old source tree, tests, benchmarks, and build files preserved as reference.
 - `lib/` - active dirtyNet library target and public headers.
-- `test/` - Catch2-based tests that link against the library.
+- `tests/` - Catch2-based tests that link against the library.
 - `perf/` - Google Benchmark performance targets that link against the library.
 - `exec/` - sample executables that demonstrate library use.
 - `sandbox/` - small exploratory executables, including standalone and library-linked examples.

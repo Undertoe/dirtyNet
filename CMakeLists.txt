@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(DIRTYNET_BUILD_PERF "Build dirtyNet performance targets" ON)
+option(DIRTYNET_BUILD_BENCHMARKS "Build dirtyNet benchmark targets" ON)
 
 include(CTest)
 
@@ -16,9 +16,9 @@ add_subdirectory(exec)
 add_subdirectory(sandbox)
 
 if(BUILD_TESTING)
-    add_subdirectory(test)
+    add_subdirectory(tests)
 endif()
 
-if(DIRTYNET_BUILD_PERF)
-    add_subdirectory(perf)
+if(DIRTYNET_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
 endif()

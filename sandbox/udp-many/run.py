@@ -15,9 +15,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 
-HOST_EXE = Path("sandbox/udp-many/host/sandbox_udp_many_host")
-UNICAST_CLIENT_EXE = Path("sandbox/udp-many/unicast-client/unicast-client")
-MULTICAST_CLIENT_EXE = Path("sandbox/udp-many/multicast-client/multicast-client")
+IMPLEMENTATIONS = ("dirtynet", "posix")
 DEFAULT_BASE_PORT = 9000
 DEFAULT_MULTICAST_PORT = 10000
 DEFAULT_TIMEOUT_SECONDS = 5.0
@@ -26,6 +24,16 @@ MAX_PORT = 65535
 
 ProcessEntry = tuple[str, subprocess.Popen[str], threading.Thread]
 OUTPUT_LOCK = threading.Lock()
+
+
+def executable_paths(implementation: str) -> tuple[Path, Path, Path]:
+    root = Path("sandbox/udp-many") / implementation
+    target_prefix = f"sandbox_udp_many_{implementation}"
+    return (
+        root / "host" / f"{target_prefix}_host",
+        root / "unicast-client" / f"{target_prefix}_unicast_client",
+        root / "multicast-client" / f"{target_prefix}_multicast_client",
+    )
 
 
 def default_build_dir() -> Path:
@@ -43,6 +51,11 @@ def default_build_dir() -> Path:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the UDP many sandbox host and clients."
+    )
+    parser.add_argument(
+        "implementation",
+        choices=IMPLEMENTATIONS,
+        help="UDP many implementation to run.",
     )
     parser.add_argument(
         "--build-dir",
@@ -220,6 +233,9 @@ def launch_process(
 def main() -> int:
     args = parse_args()
     build_dir = args.build_dir.resolve()
+    host_exe, unicast_client_exe, multicast_client_exe = executable_paths(
+        args.implementation
+    )
 
     if args.timeout < 0:
         print("--timeout must be greater than or equal to 0", file=sys.stderr)
@@ -233,17 +249,20 @@ def main() -> int:
         return 2
 
     try:
-        require_executable(build_dir, HOST_EXE)
-        require_executable(build_dir, UNICAST_CLIENT_EXE)
-        require_executable(build_dir, MULTICAST_CLIENT_EXE)
+        require_executable(build_dir, host_exe)
+        require_executable(build_dir, unicast_client_exe)
+        require_executable(build_dir, multicast_client_exe)
     except (FileNotFoundError, PermissionError) as error:
         print(error, file=sys.stderr)
-        print("Build them first with: make udp-many", file=sys.stderr)
+        print(
+            f"Build them first with: make udp-many-{args.implementation}",
+            file=sys.stderr,
+        )
         return 1
 
     processes: list[ProcessEntry] = []
     try:
-        launch_process(processes, "host", [f"./{HOST_EXE}"], build_dir)
+        launch_process(processes, "host", [f"./{host_exe}"], build_dir)
 
         if args.startup_delay > 0:
             time.sleep(args.startup_delay)
@@ -252,7 +271,7 @@ def main() -> int:
             launch_process(
                 processes,
                 f"unicast-client-{client_id}:{port}",
-                [f"./{UNICAST_CLIENT_EXE}", str(port)],
+                [f"./{unicast_client_exe}", str(port)],
                 build_dir,
             )
 
@@ -260,7 +279,7 @@ def main() -> int:
             launch_process(
                 processes,
                 f"multicast-client-{client_id}:{multicast_port}",
-                [f"./{MULTICAST_CLIENT_EXE}", str(multicast_port)],
+                [f"./{multicast_client_exe}", str(multicast_port)],
                 build_dir,
             )
 
