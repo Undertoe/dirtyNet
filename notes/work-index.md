@@ -4,71 +4,103 @@ Use this file to quickly answer: "What is the next work we should look at?"
 
 ## Quick Answer
 
-Next work: complete Step 0, the smallest IPv4-only dirtyNet UDP vertical slice:
-`port` and `ipv4`, `ipv4` into `ip`, `ip + port` into `endpoint`, the POSIX
-native endpoint seam, a baseline blocking UDP socket, and dirtyNet UDP
-ping/pong.
+Current work: add IPv4 multicast receive support to `udp_socket` on the
+`feature/multicast` branch.
 
-Primary design reference: `notes/rev0-design.md`.
+The existing IPv4 address, endpoint, move-only UDP socket, blocking
+`send_to`/`receive`, and UDP ping/pong path are the working baseline. Do not
+reopen those designs unless the multicast work exposes a concrete problem.
 
-Detailed decision queue: `notes/rev0-design-questions.md`.
+Primary implementation checklist: `notes/working-todos.md`.
 
-Implementation is active on `project-setup-ip`. Continue to require Terry's
-explicit request before editing specific C++ sources, headers, benchmarks, or
-tests.
+Current direction and milestone order: `notes/plan-going-forward.md`.
+
+Approved revision 0 background: `notes/rev0-design.md` and
+`notes/rev0-design-questions.md`.
+
+Continue to require Terry's explicit request before editing specific C++
+sources, headers, benchmarks, or tests.
 
 ## Current Work Stream
 
-Step 0 proof-of-concept implementation.
+### IPv4 Multicast
 
-Goal: prove the smallest end-to-end dirtyNet path with IPv4 UDP ping/pong, then
-use that working path to choose socket-I/O defaults and options for the MVP.
+Goal: let a caller create an ordinary movable `udp_socket` that is already
+bound to a multicast port and joined to one IPv4 multicast group.
 
-Current implementation branch: `project-setup-ip`.
+The intended public entry points are static factories with these conceptual
+forms:
 
-The revision 0 design is approved and merged. Baseline Linux socket behavior
-and the existing UDP sandbox remain the implementation feedback loop.
+- `udp_socket::bind_multicast(group_endpoint)` lets the OS choose the local
+  interface.
+- `udp_socket::bind_multicast(group_endpoint, local_interface_ip)` selects a
+  local IPv4 interface explicitly.
 
-## Prior Implementation Learning Stream
+The POSIX path should create the socket, enable the required address reuse,
+bind the wildcard address at the group's port, join the group, and return the
+same `udp_socket` type used by ordinary UDP operations. Membership follows the
+native descriptor when the socket moves and ends when it closes.
 
-Baseline Linux socket behavior.
-
-Goal: build understanding of raw Linux networking behavior before shaping dirtyNet abstractions.
-
-Primary reference: `notes/plan-going-forward.md`.
-
-Main library notes: `notes/dirtynet-library-notes.md`.
-
-Planned feature notes: `notes/planned-features.md`.
-
-Current UDP learning notes: `notes/udp-pingpong-library-notes.md`.
+Prove the behavior through the existing `sandbox/udp-many/` exercise. Keep the
+first pass to IPv4 any-source multicast and one membership per socket.
 
 ## Ordered Task Queue
 
-1. Use `notes/working-todos.md` as the high-level implementation checklist.
-2. Use the approved header-only `lib/dirtynet/*.hh` layout and CMake
-   `INTERFACE` target shape when implementation begins.
-3. Complete the IPv4-only Step 0 vertical slice described in
-   `notes/working-todos.md`.
-4. Validate Step 0 with dirtyNet UDP ping/pong.
-5. Use Step 0 evidence to define baseline socket-I/O defaults and explicit
-   options.
-6. Complete IPv6 through the established address, endpoint, and UDP seams.
-7. Revisit portable error/result granularity with implementation evidence.
-8. Add the remaining capabilities required for the exchange-facing MVP.
-9. Return to callback and async mechanics after the blocking contracts are
-   proven.
+1. Implement the IPv4 multicast factory and dirtyNet fanout proof.
+2. Establish GitHub Actions CI for supported configure, build, and test paths.
+3. Establish a repeatable UDP performance baseline and reporting rules.
+4. Make dirtyNet consumable from a separate CMake project.
+5. Add a minimal move-only blocking outbound TCP connection.
+6. Add hostname resolution that returns endpoint candidates.
+7. Expand to the Bitcoin project.
 
-## Follow-On Questions
+The application project should feed requirements back into dirtyNet one small,
+measured feature at a time. It does not redefine dirtyNet as an
+application-specific networking library.
 
-- Which responsibilities belong to `strategy`, and which belong to a later
-  runtime context or executor?
-- Who owns event operations and accepted TCP connections?
-- Which non-default borrowed, pooled, or allocator-aware storage policies are
-  worth implementing after caller-owned storage is proven?
-- How do repeated callback loops stop and report their terminal result?
-- Should factories live on protocol facades or the resource types they return?
-- Which baseline examples should live under `exec/`, `sandbox/`, or another intentionally chosen area?
-- Should each baseline be a single executable with modes, or separate client/server executables?
-- What behavior should be documented for each baseline before turning it into a reusable dirtyNet abstraction?
-- Which pieces of the UDP ping-pong boilerplate should become the first `endpoint` and `udp_socket` APIs?
+## Work-Slice Rule
+
+Treat each numbered milestone as a direction, not as one oversized change. The
+normal implementation slice is:
+
+1. record one concrete usage demand;
+2. decide the smallest public API change that satisfies it;
+3. implement the corresponding native behavior;
+4. add focused contract tests;
+5. prove the API in a sandbox or external consumer;
+6. measure it when the change can affect performance.
+
+Finish and review that slice before absorbing adjacent conveniences. A demand
+found in a demonstration project is evidence to consider an API update, not an
+automatic requirement to add one.
+
+## Measurement Rule
+
+Performance work must be compared against a reproducible baseline. Changes
+should not degrade throughput without an explicit, documented reason and
+evidence. Improvements should report both rate and relevant costs rather than
+only a single best-case number.
+
+Useful initial observations include:
+
+- datagrams and bytes processed per second;
+- latency distribution where the workload makes latency meaningful;
+- allocations and copies on the receive path;
+- loss, truncation, and sequence gaps under load;
+- CPU use and benchmark configuration.
+
+CI should validate correctness. Performance measurements should initially be
+reported rather than enforced as a noisy pass/fail gate.
+
+## Later Design Questions
+
+- What execution strategies should the library own for repeated reads and
+  multiple sockets?
+- Which responsibilities belong to a strategy, executor, or runtime context?
+- Which caller-owned, pooled, or allocator-aware storage models earn a public
+  abstraction?
+- How should cancellation, timers, and repeated operation results compose?
+- When should IPv6 multicast, multiple memberships, and source-specific
+  multicast enter the API?
+- What portable error detail is needed once UDP and TCP have both exercised the
+  native boundary?

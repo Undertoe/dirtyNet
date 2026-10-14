@@ -18,6 +18,11 @@ enum class udp_bind_error
     error,
 };
 
+enum class udp_multicast_bind_error
+{
+    error,
+};
+
 // placeholder for now
 enum class udp_send_error
 {

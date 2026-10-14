@@ -2,11 +2,13 @@
 
 
 #include "dirtynet/detail/native_udpsocket.hh"
+#include "dirtynet/port.hh"
 #include "endpoint.hh"
 #include "detail/native_endpoint.hh"
 #include "dirtynet/endpoint.hh"
 #include "error/udp.hh"
 #include <algorithm>
+#include <optional>
 #include <span>
 #include <cstddef>
 
@@ -55,6 +57,16 @@ public:
         return udp_socket(std::move(*mNative));
     }
 
+    static std::expected<udp_socket, udp_multicast_bind_error> bind_multicast(const endpoint& group)
+    {
+        auto mNative = detail::native::udp_socket::bind_multicast(detail::endpoint_native_access::get(group));
+        if(!mNative)
+        {
+            return std::unexpected<udp_multicast_bind_error>(mNative.error());
+        }
+        return udp_socket(std::move(*mNative));
+    }
+
     static std::expected<udp_socket, udp_bind_error> bind(const dirtynet::endpoint& endpoint)
     {
         auto mNative = detail::native::udp_socket::bind(detail::endpoint_native_access::get(endpoint));
@@ -80,6 +92,27 @@ public:
             return std::unexpected<dirtynet::udp_recv_error>(r.error());
         }
         return udp_datagram{r->bytes, detail::endpoint_native_access::from_native(r->sender), r->truncated};
+    }
+
+
+    std::optional<port> get_port() const 
+    {
+        auto mPort = _native.get_port();
+        if(!mPort) 
+        {
+            return std::nullopt;
+        }
+        return port::from_native(*mPort);
+    }
+
+    bool is_open() const 
+    {
+        return _native.is_open();
+    }
+
+    bool is_multicast() const 
+    {
+        return _native.is_multicast();
     }
 
 
