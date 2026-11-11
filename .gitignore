@@ -21,3 +21,6 @@ cmake-build-*/
 .DS_Store
 Thumbs.db
 __pycache__/
+
+# Claude Code local settings
+.claude/settings.local.json

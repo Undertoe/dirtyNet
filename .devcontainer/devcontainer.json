@@ -45,7 +45,7 @@
         "ms-vscode.powershell",
         "ms-vscode.remote-explorer",
         "nvidia.nsight-vscode-edition",
-        "openai.chatgpt",
+        "anthropic.claude-code",
         "redhat.vscode-yaml",
         "twxs.cmake"
       ]

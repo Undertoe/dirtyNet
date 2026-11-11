@@ -115,6 +115,22 @@ public:
         return _native.is_multicast();
     }
 
+    udp_socket(const udp_socket& other) = delete;
+    udp_socket(udp_socket&& other) : _native(std::move(other._native))
+    {
+        
+    }
+
+    udp_socket& operator=(udp_socket&& other)
+    {
+        if(this == &other)
+        {
+            return *this;
+        }
+        this->_native = std::move(other._native);
+        return *this;
+    }
+
 
 private: 
 

@@ -108,21 +108,28 @@ public:
         return sock;
     }
 
-    udp_socket(udp_socket&& other)
+    udp_socket(udp_socket&& other) : _bytes(std::move(other._bytes)), _fd(other._fd), _multicast(other._multicast)
     {
-        _fd = other._fd;
         other._fd = -1;
+
     }
 
     udp_socket& operator=(udp_socket&& other)
     {
+        if(this == &other)
+        {
+            return *this;
+        }
         // close our socket if it was already opened.
         if(_fd > -1)
         {
             close(_fd);
         }
+        _bytes = std::move(other._bytes);
         _fd = other._fd;
         other._fd = -1;
+        _multicast = other._multicast;
+
         return *this;
     }
 
@@ -200,6 +207,7 @@ public:
 
 private:
     explicit udp_socket(int fd, bool multicast = false) : _fd(fd), _multicast(multicast) {} 
+
     static constexpr size_t _max_ipv4_packet_size = 65507;
     std::vector<std::byte> _bytes{_max_ipv4_packet_size};
 
