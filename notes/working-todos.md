@@ -1,195 +1,206 @@
 # Working TODOs
 
-This is the high-level coding checklist for the current dirtyNet implementation
-pass. It records what needs to be built without fixing exact API signatures,
-parameter lists, result types, or factory names.
+This is the implementation checklist for the next dirtyNet milestones. It
+records required behavior without making provisional signatures or result
+types permanent.
 
-## Milestone Shape
+## How To Use This Checklist
 
-Implementation is split into two layers:
+Do not implement an entire milestone as one change. Pull one coherent vertical
+slice at a time through these checkpoints:
 
-- **Step 0: UDP proof of concept.** Build the smallest IPv4-only vertical slice
-  that can run dirtyNet UDP ping/pong. This proves the address, endpoint, native
-  socket, and byte-oriented I/O seams.
-- **MVP: exchange-facing foundation.** Extend the proven slice with IPv6,
-  hostname resolution, and socket-I/O defaults and options needed to begin
-  talking to an exchange. Exact exchange protocol and session behavior remain
-  above this networking-core milestone.
+- [ ] State the caller demand and why the current API cannot satisfy it.
+- [ ] Agree on the smallest public API update, including ownership and errors.
+- [ ] Implement its native behavior without unrelated cleanup.
+- [ ] Add focused public-contract and failure-path tests.
+- [ ] Exercise it in the relevant sandbox or external consumer.
+- [ ] Measure it when it affects a performance-sensitive path.
+- [ ] Record newly discovered conveniences or extensions as later work.
 
-Step 0 intentionally favors one concrete, untemplated blocking implementation.
-Its purpose is to produce evidence before fixing the broader default and option
-system.
+An implementation exercise may show that no API change is required. Prefer
+that result when the existing primitives compose cleanly.
 
-## Step 0: Smallest UDP Vertical Slice
+## Implemented Baseline
 
-### Address Values
+- [x] Host-order `port` value and native conversion.
+- [x] Numeric IPv4 parsing and public IP value types.
+- [x] Public endpoint values and POSIX native conversion.
+- [x] Move-only UDP socket ownership.
+- [x] Blocking UDP bind, `send_to`, and receive operations.
+- [x] Sender endpoint reporting.
+- [x] A public truncation field exists on received datagrams.
+- [x] dirtyNet UDP ping/pong proof.
+- [x] Header-only CMake `INTERFACE` target and `dirtyNet::dirtynet` alias.
 
-- Finish `port` as a host-order public value with native conversion isolated
-  behind its access helper.
-- Finish numeric `ipv4` parsing, localhost/any creation, formatting, equality,
-  and native access.
-- Construct the family-erased `ip` value from `ipv4`; IPv4 is the baseline
-  family for Step 0.
+These items are the working foundation. Fix concrete defects as they appear,
+but do not make broad UDP cleanup a prerequisite for multicast.
 
-### Endpoint
+## Immediate Testing Debt
 
-- Construct `endpoint` from validated `ip + port` values.
-- Provide a fallible numeric-string + port path that parses the address and then
-  composes the endpoint.
-- Eagerly prepare the POSIX native IPv4 endpoint used by socket calls.
-- Convert validated POSIX endpoint data back into public `ip`, `port`, and
-  `endpoint` values.
-- Add focused public and internal/native round-trip tests. The exact test
-  grouping may be refined while the seam is implemented.
+These are the largest gaps in the current automated suite. Address them in
+small slices alongside multicast rather than turning them into an open-ended
+UDP rewrite.
 
-### Baseline UDP Socket
+### Make The Existing Suite Reliable
 
-- Add move-only native socket ownership and non-throwing cleanup.
-- Start with one untemplated public UDP socket type.
-- Use a single blocking execution path; do not require the final strategy or
-  template system for Step 0.
-- Add the minimum bind, `send_to`, and receive operations.
-- Return received bytes in an owning byte vector for the baseline path.
-- Return or otherwise report the sender endpoint needed to reply to a datagram.
-- Keep provisional bind/send/receive errors sufficient for exercising the
-  vertical slice.
+- [ ] Replace the fixed UDP test port `1337` with an OS-selected ephemeral
+  port. The fixed-port test currently fails when that port is already in use.
+- [ ] Ensure every network test has a bounded completion path so a missing
+  datagram fails instead of hanging the test process.
+- [ ] Run tests from a fresh build tree in CI; do not depend on a build cache
+  created at a different filesystem path or on another host.
 
-### Proof
+### Cover The Public UDP Contract
 
-- Build the dirtyNet UDP ping/pong implementation on the Step 0 API.
-- Confirm bind, outbound send, inbound bytes, sender endpoint conversion, and
-  reply behavior end to end.
-- Record which socket-I/O choices should become defaults and which require
-  explicit options; do not finalize those policies before the proof runs.
+- [ ] Add a loopback test through public `udp_socket` APIs that binds, sends,
+  receives, and verifies the exact payload and sender endpoint.
+- [ ] Test public `open()` and `bind()` success independently of the native
+  implementation tests.
+- [ ] Verify that a socket remains usable after move construction and move
+  assignment, without duplicate descriptor ownership.
+- [ ] Exercise representative open, bind, send, and receive failure paths and
+  confirm failed construction does not leak a descriptor.
+- [ ] Define and test the truncation contract. The public field exists, but the
+  POSIX receive path currently always reports `false`.
 
-## MVP After Step 0
+### Add Multicast Contract Coverage
 
-- Complete `ipv6` and extend `ip`, endpoint conversion, and UDP behavior through
-  the already-proven family-neutral seams.
-- Add explicit hostname resolution with address-family filtering while
-  preserving the resolver behavior selected in the revision 0 design.
-- Define the baseline socket-I/O defaults using Step 0 evidence.
-- Add explicit options where the baseline exchange workflow needs behavior that
-  should not be universal.
-- Refine the portable error/result model while retaining useful native
-  diagnostic evidence.
-- Exercise the resulting networking foundation against the first concrete
-  exchange-facing workflow.
+- [ ] Reject a non-multicast group endpoint with a predictable public error.
+- [ ] Bind and join using the OS-selected interface path.
+- [ ] Bind and join using an explicit loopback IPv4 interface.
+- [ ] Bind two receivers to the same group and port, send one identified
+  datagram, and verify that both receive it. This is the key proof that reuse,
+  wildcard binding, and group membership compose correctly.
+- [ ] Verify payload and sender endpoint preservation on multicast receive.
+- [ ] Move a joined socket and verify that the moved-to socket still receives;
+  membership and descriptor ownership must move together.
+- [ ] Exercise failures after descriptor creation, especially bind and group
+  join failures, to check cleanup on partial construction.
 
-## Full Revision 0 Component Checklist
+Use polling or a test-only bounded wait for delivery-sensitive integration
+tests. Do not add timeout policy to the public UDP API merely to support the
+test harness.
 
-The sections below retain the complete component-level backlog. The Step 0 and
-MVP sections above determine implementation order; completion of every item
-below is not required before the IPv4 UDP proof runs.
+### Add Tooling Coverage After The Contract Tests
 
-## Project Structure
+- [ ] Run the network tests under AddressSanitizer and UndefinedBehaviorSanitizer
+  in at least one CI configuration.
+- [ ] Keep local multicast delivery as a separate integration label if it is
+  unreliable on a hosted runner; deterministic validation must still cover
+  address validation and failure cleanup.
 
-- Convert `dirtynet` to a header-only CMake `INTERFACE` target.
-- Place public headers directly under `lib/dirtynet/`.
-- Place shared implementation headers under `lib/dirtynet/detail/`.
-- Place the first native backend under `lib/dirtynet/detail/posix/`.
-- Use `.hh` for dirtyNet headers.
-- Keep maintained executables under `exec/` and automated checks under
-  `tests/`.
+## Current Milestone: IPv4 Multicast
 
-## `port`
+Implement this milestone as three reviewable slices:
 
-- Store a port value in host byte order.
-- Support port `0` for OS-selected ephemeral ports.
-- Provide access to the stored numeric value.
-- Provide equality and ordinary value-type behavior.
-- Handle native byte-order conversion at the native boundary.
+1. settle the two public `bind_multicast` factory contracts and error behavior;
+2. implement and test the POSIX construction path;
+3. prove fanout through `sandbox/udp-many/` and record follow-up demands.
 
-## `ipv4`
+### Public Behavior
 
-- Add factory functions for numeric IPv4 parsing.
-- Implement `localhost` and `any` creation.
-- Implement `string` formatting.
-- Store an already-parsed binary IPv4 representation.
-- Provide equality and ordinary value-type behavior.
-- Provide internal native access without reparsing.
+- [ ] Add a static `udp_socket::bind_multicast(group_endpoint)` factory.
+- [ ] Add an overload accepting the local IPv4 interface address.
+- [ ] Return the ordinary movable `udp_socket`; keep send and receive behavior
+  unchanged after construction.
+- [ ] Report invalid group, bind, and membership failures through the current
+  error approach with useful native evidence.
 
-## `ipv6`
+### POSIX Behavior
 
-- Add factory functions for numeric IPv6 parsing.
-- Implement `localhost` and `any` creation.
-- Implement `string` formatting.
-- Store an already-parsed binary IPv6 representation.
-- Provide equality and ordinary value-type behavior.
-- Provide internal native access without reparsing.
+- [ ] Create an IPv4 UDP descriptor.
+- [ ] Enable the address reuse required for local multicast receivers.
+- [ ] Bind `0.0.0.0` at the multicast group's port.
+- [ ] Join the group with `IP_ADD_MEMBERSHIP`.
+- [ ] Use the default interface when none is provided.
+- [ ] Use the supplied local IPv4 address when an interface is provided.
+- [ ] Ensure all failure paths close the descriptor.
+- [ ] Confirm descriptor ownership and membership survive socket moves.
 
-## `ip`
+### Proof And Tests
 
-- Wrap either a valid `ipv4` or `ipv6` value.
-- Implement `localhost` and `any` defaults.
-- Implement `string` formatting by delegating to the active address family.
-- Provide address-family inspection for internal endpoint construction.
-- Provide equality across `ip` values while preserving family distinctions.
+- [ ] Complete the dirtyNet side of `sandbox/udp-many/` as a local multicast
+  fanout proof.
+- [ ] Complete the multicast contract coverage listed under immediate testing
+  debt.
 
-## `endpoint`
+### Deferred From The First Multicast Pass
 
-- Construct directly from a valid IP value and `port`.
-- Retain the semantic IP and port values.
-- Eagerly prepare the complete native endpoint representation.
-- Provide access to the semantic address and port.
-- Provide internal native access for socket operations.
-- Add internal conversion from validated native endpoint data.
-- Provide equality and ordinary value-type behavior.
+- explicit leave operations;
+- multiple memberships per socket;
+- IPv6 and source-specific multicast;
+- multicast sender TTL, interface, and loopback controls;
+- a public network-interface abstraction;
+- generic socket-option exposure.
 
-### Next Step: Endpoint Construction
+## Next Checkpoint: CI
 
-Handle all four construction inputs during revision 0:
+- [ ] Add a GitHub Actions workflow for configure, build, and tests.
+- [ ] Select a small supported compiler/build matrix.
+- [ ] Avoid network- or timing-sensitive multicast tests as mandatory CI gates
+  unless they are reliable on hosted runners.
+- [ ] Keep the local multicast sandbox documented as a quick manual proof.
 
-- Validated native endpoint data.
-- Numeric IP strings.
-- Port values, including the intended integer and string forms.
-- URL or hostname lookup through a fallible resolution path.
+## Next Checkpoint: Performance Measurement
 
-Keep the exact URL/hostname resolution boundary separate from numeric IP
-parsing while deciding how its resulting endpoint candidates enter the public
-API.
+- [ ] Reconcile `perf/` with the current `benchmarks/` CMake wiring and choose
+  one maintained location.
+- [ ] Define release-build, warmup, repetition, and machine-context rules.
+- [ ] Add a repeatable UDP receive workload with controlled payload sizes and
+  message counts.
+- [ ] Report datagrams/second and bytes/second as the primary throughput
+  measures.
+- [ ] Track allocations, copies, CPU use, loss, truncation, and sequence gaps
+  when relevant to a change.
+- [ ] Preserve historical results or commands well enough to compare meaningful
+  iterations.
+- [ ] Treat unexplained throughput degradation as a defect; do not use noisy
+  microbenchmark thresholds as the first CI gate.
 
-## Native Endpoint Layer
+## External CMake Consumer
 
-- Define shared `native_endpoint` storage and length handling.
-- Implement IPv4 endpoint conversion for POSIX.
-- Implement IPv6 endpoint conversion for POSIX.
-- Validate address family and native length when converting from OS-provided
-  data.
-- Convert native ports back to host byte order.
-- Keep POSIX address structures out of the ordinary public API.
-- Avoid parsing, resolving, allocating, or rebuilding an unchanged endpoint
-  during repeated socket operations.
+- [ ] Create a minimal separate-project proof that links
+  `dirtyNet::dirtynet`.
+- [ ] Confirm public include paths and compile requirements propagate from the
+  target.
+- [ ] Choose and document the initial consumption method.
+- [ ] Add install/export packaging only when the separate consumer benefits
+  from it.
 
-## Provisional Errors And Tests
+## Minimal Blocking TCP
 
-- Use a small provisional failure/result shape for parsing and native
-  conversion.
-- Do not treat the first error names or categories as stable API commitments.
-- Add focused tests for numeric IPv4 and IPv6 parsing and formatting.
-- Add tests for `localhost`, `any`, equality, and invalid numeric input.
-- Add tests for port `0` and byte-order conversion.
-- Add IPv4 and IPv6 endpoint round-trip tests through the POSIX native layer.
+Begin with the outbound connection and partial byte-I/O contract. Keep
+convenience loops, framing, listeners, and execution strategies in separate
+follow-up slices.
 
-## Later MVP And Post-Proof Work
+- [ ] Add move-only native TCP connection ownership.
+- [ ] Connect outbound to an endpoint.
+- [ ] Add blocking `read_some` into caller-owned writable bytes.
+- [ ] Add blocking `write_some` from caller-owned bytes.
+- [ ] Return byte counts and distinguish EOF from an error.
+- [ ] Add close and minimal shutdown behavior.
+- [ ] Test partial reads/writes and peer closure.
+- [ ] Prove the path with a small client exercise.
 
-- Review implementation evidence and refine the portable error model.
-- Complete the IPv6 address and native-endpoint path.
-- Add hostname resolution after the basic UDP path is proven.
-- Add one-shot `on_receive` under the UDP socket object after direct blocking
-  receive behavior is established.
-- Add outbound packet-concept support through `to_bytes` for socket send/write
-  operations.
-- Expand socket-I/O defaults and options using the UDP ping/pong evidence.
+Do not require a TCP listener, server abstraction, threading model, callback
+model, or TLS for this milestone.
 
-## Deferred
+## Hostname Resolution
 
-- Typed receive/read operations.
-- Repeated callback operations owned by the library.
-- Async execution and callback scheduling.
-- TCP resources and stream operations.
-- Connected UDP.
-- Multicast membership.
-- Timeouts and retry policy.
+- [ ] Resolve a host and service/port separately from numeric IP parsing.
+- [ ] Return multiple endpoint candidates.
+- [ ] Permit address-family filtering where useful.
+- [ ] Preserve actionable native failure details.
+- [ ] Prove connection attempts across returned candidates.
+
+## Later Library Work
+
+- IPv6 across address, endpoint, UDP, and TCP paths.
+- `read_exactly` and `write_all` convenience algorithms.
+- Optional typed serialization over the byte APIs.
+- Repeated read and multi-socket execution strategies.
+- Batching, cancellation, and timers.
+- Caller-selectable storage and allocation strategies.
+- TCP listening and accepted-connection ownership.
+- Portable error-model refinement using evidence from UDP and TCP.
 - Windows backend implementation.
-- Stable comprehensive error taxonomy.

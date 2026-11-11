@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sys/socket.h>
 #include <cstddef>
 #include <netinet/in.h>
 #include <optional>
@@ -49,7 +50,45 @@ public:
             return std::unexpected<dirtynet::udp_open_error>(dirtynet::udp_open_error::error);
         }
         return udp_socket{fd};
+    }
 
+
+    static std::expected<udp_socket, udp_multicast_bind_error> bind_multicast(const endpoint& group)
+    {
+        auto fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if(fd < 0)
+        {
+            return std::unexpected<dirtynet::udp_multicast_bind_error>(dirtynet::udp_multicast_bind_error::error);
+        }
+        // create the socket asap to RAII wrap it.
+        // kills the fd properly when a failure happens.
+        udp_socket sock{fd, true};
+
+        int reuse = 1;
+        if(auto sockopt = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)); sockopt < 0)
+        {
+            return std::unexpected<dirtynet::udp_multicast_bind_error>(dirtynet::udp_multicast_bind_error::error);
+        }
+        endpoint local{ip::any(), group.get_port()};
+        auto [localAddr, len] = local.addr_info();
+        auto bound = ::bind(fd, (sockaddr*)localAddr, len);
+        if(bound < 0)
+        {
+            return std::unexpected<dirtynet::udp_multicast_bind_error>(dirtynet::udp_multicast_bind_error::error);
+        }
+
+        // handle the actual traffic address
+        ip_mreq req{};
+        req.imr_multiaddr.s_addr = group.get_ip().get_ipv4()->native().s_addr;
+        req.imr_interface.s_addr = htonl(INADDR_ANY);
+
+        if(auto multicast_sockopt = setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &req, sizeof(req)); multicast_sockopt < 0)
+        {
+            return std::unexpected<dirtynet::udp_multicast_bind_error>(dirtynet::udp_multicast_bind_error::error);
+        }
+
+        // now have a full socket
+        return sock;
     }
 
     static std::expected<udp_socket, dirtynet::udp_bind_error> bind(const endpoint& ep)
@@ -69,21 +108,28 @@ public:
         return sock;
     }
 
-    udp_socket(udp_socket&& other)
+    udp_socket(udp_socket&& other) : _bytes(std::move(other._bytes)), _fd(other._fd), _multicast(other._multicast)
     {
-        _fd = other._fd;
         other._fd = -1;
+
     }
 
     udp_socket& operator=(udp_socket&& other)
     {
+        if(this == &other)
+        {
+            return *this;
+        }
         // close our socket if it was already opened.
         if(_fd > -1)
         {
             close(_fd);
         }
+        _bytes = std::move(other._bytes);
         _fd = other._fd;
         other._fd = -1;
+        _multicast = other._multicast;
+
         return *this;
     }
 
@@ -148,13 +194,25 @@ public:
         return port::from_native(addr.sin_port);
     }
 
+    bool is_open() const 
+    {
+        return _fd != -1;
+    }
+
+    bool is_multicast() const 
+    {
+        return _multicast;
+    }
+
 
 private:
-    explicit udp_socket(int fd) : _fd(fd) {} 
+    explicit udp_socket(int fd, bool multicast = false) : _fd(fd), _multicast(multicast) {} 
+
     static constexpr size_t _max_ipv4_packet_size = 65507;
     std::vector<std::byte> _bytes{_max_ipv4_packet_size};
 
     int _fd{-1};
+    bool _multicast{false};
 
 
 };

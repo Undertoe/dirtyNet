@@ -38,6 +38,7 @@ RUN if [ -f /etc/dpkg/dpkg.cfg.d/excludes ]; then \
         nodejs \
         npm \
         pkg-config \
+        socat \
         sudo \
         time \
         valgrind \
@@ -51,7 +52,7 @@ RUN if [ -f /etc/dpkg/dpkg.cfg.d/excludes ]; then \
     && mandb -c \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g @openai/codex
+RUN npm install -g @anthropic-ai/claude-code
 
 RUN git config --system --add safe.directory /home/vscode/.ai-memories \
     && git config --system --add safe.directory /workspace/dirtyNet
@@ -61,6 +62,8 @@ RUN chmod +x /usr/local/bin/devcontainer-entrypoint
 
 RUN useradd --create-home --shell /bin/bash "${USERNAME}" \
     && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${USERNAME}" \
-    && chmod 0440 "/etc/sudoers.d/${USERNAME}"
+    && chmod 0440 "/etc/sudoers.d/${USERNAME}" \
+    && mkdir -p "/home/${USERNAME}/.claude" \
+    && chown "${USERNAME}:${USERNAME}" "/home/${USERNAME}/.claude"
 
 WORKDIR /workspace/dirtyNet

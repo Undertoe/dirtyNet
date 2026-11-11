@@ -36,6 +36,8 @@ TEST_CASE("dirtynet::detail::posix::udp_socket", "static_ctrs")
         auto p = *socket.get_port();
         auto port = dirtynet::port::from_native(p);
         REQUIRE(port == ogPort);
+
+        // std::string data{"123456"};
     }
 }
 

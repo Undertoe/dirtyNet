@@ -37,6 +37,21 @@ public:
         return _native == other._native;
     }
 
+    port get_port() const 
+    {
+        return port::from_native(_native.get_port());
+    }
+
+    std::optional<ip> get_ip() const 
+    {
+        auto mipv4 = _native.get_ip().get_ipv4();
+        if(!mipv4)
+        {
+            return std::nullopt;
+        }
+        return detail::ip_native_access::from_native(mipv4->native());
+    }
+
 private:
 
     endpoint(detail::native::endpoint native) : _native(std::move(native)) {}

@@ -1,108 +1,141 @@
 # Planned Features
 
-Use this file for reusable dirtyNet feature ideas before they are ready to
-become source code. During the experimental phase, keep entries loosely scoped:
-capture direction and design pressure without turning notes into a binding API
-spec too early.
+Use this file for reusable dirtyNet feature directions that are not yet stable
+public API. Detailed implementation order belongs in `notes/working-todos.md`.
 
-## Address Foundation
+## Guiding Boundary
 
-Goal: reduce cognitive load around socket address setup, byte order, and
-address-family details before building higher-level socket abstractions.
+dirtyNet is a generic networking layer. It should make sockets easier to own,
+compose, and operate efficiently without embedding an application protocol or
+forcing callers into one execution or storage model.
 
-These pieces may start as separate value types, but the main user-facing shape
-will likely be an endpoint object that combines an IP address and port.
+The blocking byte APIs remain the dependable lower layer. Typed operations,
+execution strategies, and storage policies should be optional composition over
+that layer.
 
-### Port Object Abstraction
+## API Demand Tracking
 
-Provide a small value type for network ports.
+New use cases should be written first as caller demands: the operation needed,
+ownership and lifetime constraints, error behavior, composition needs, and any
+measurable performance pressure. Only then should they become API proposals.
 
-Intent:
+Prefer one narrow public addition that can be implemented and exercised end to
+end. Keep related convenience overloads, policy systems, and speculative
+generality as separate follow-up candidates. This keeps reviews understandable
+and makes it possible to attribute correctness and performance changes to a
+specific API decision.
 
-- Store port values in host byte order internally.
-- Convert to network byte order at the POSIX boundary with `htons`.
-- Convert from network byte order with `ntohs` when reading from socket address
-  structures.
-- Keep port `0` valid for "let the OS choose an ephemeral port."
-- Make raw byte-order handling rare in application-facing code.
+## IPv4 Multicast Binding
 
-Open questions:
+Provide explicit factories that return an ordinary `udp_socket` already bound
+and joined to a group.
 
-- Should construction accept only `std::uint16_t`, or should there be checked
-  factories for wider integer and string inputs?
-- Should the type be named `port`, `network_port`, or something protocol scoped?
-- Should service-name lookup be handled elsewhere, or stay out of the first
-  version?
+Initial direction:
 
-### IP Object Abstraction
+- accept a multicast group endpoint;
+- optionally accept a local IPv4 interface address;
+- bind the wildcard local address at the group port;
+- join one any-source group;
+- preserve existing UDP send and receive operations;
+- make membership lifetime follow native socket ownership.
 
-Provide an IP address value type that can represent both IPv4 and IPv6.
+Do not add a public interface-enumeration abstraction until concrete needs make
+an IP address insufficient.
 
-Intent:
+Later multicast extensions may include multiple memberships, explicit leave,
+IPv6, source-specific multicast, and sender controls.
 
-- Hide the difference between IPv4 and IPv6 storage from most caller code.
-- Preserve the address family explicitly so endpoint and socket setup can choose
-  the correct POSIX structures.
-- Support parsing from text and formatting back to text.
-- Keep conversion to `sockaddr_in`, `sockaddr_in6`, or `sockaddr_storage`
-  centralized instead of repeated across examples and library code.
-- Leave room for loopback, any-address, and possibly multicast helpers without
-  forcing them into raw socket setup code.
+## Blocking TCP Connection
 
-Open questions:
+Provide a distinct move-only outbound stream resource rather than a generic
+public socket base.
 
-- Should this be named `ip_address`, `address`, or split into `ipv4_address` and
-  `ipv6_address` with a wrapper type?
-- Should DNS/name resolution be a separate feature from literal IP address
-  parsing?
-- Should endpoint construction own address-family compatibility checks between
-  `ip_address` and `port`?
+Initial direction:
 
-### Endpoint Object Abstraction
+- connect using an endpoint;
+- read into caller-owned storage;
+- write from caller-owned storage;
+- expose partial progress through byte counts;
+- distinguish orderly EOF from errors;
+- support close and minimal shutdown.
 
-Provide a complete endpoint value type made from an IP address and a port.
+Stream framing belongs to the caller. `read_exactly`, `write_all`, or framed
+helpers can later compose over the partial-I/O primitives.
 
-Intent:
+Listeners and accepted connections are separate later features because they
+introduce different ownership and execution questions.
 
-- Represent "where a socket binds or sends" as one object.
-- Keep IP-family, port, and socket-address conversion decisions together.
-- Let socket APIs consume endpoints instead of separate address and port values.
-- Reduce repeated `sockaddr` setup across experiments without hiding the core
-  socket behavior too aggressively.
+## Hostname Resolution
 
-Loose first shape:
+Keep resolution separate from literal IP parsing and endpoint value semantics.
+Resolution should return multiple endpoint candidates rather than hiding
+selection and connection fallback inside a single opaque call.
 
-- `endpoint = ip_address + port`
-- usable for local bind targets and remote send/connect targets
-- convertible at the POSIX boundary into the appropriate socket-address storage
+Questions to resolve with implementation evidence:
 
-Open questions:
+- How are candidate ordering and address-family filters represented?
+- Does service-name lookup belong in the first resolver or only numeric ports?
+- Which portable error categories retain enough native diagnostic value?
 
-- Should endpoint be generic across IPv4 and IPv6 from the start, or should
-  experiments begin with IPv4 and leave the shape ready for IPv6?
-- Should local endpoints and remote endpoints be the same type?
-- How much POSIX storage should endpoint own directly versus produce on demand?
+## External Consumption And Packaging
 
-## Typed Socket Direction
+The library must be usable by an independent CMake project through a stable
+namespaced target. Begin with the smallest source-based consumption path, then
+add install and package-export support when it solves a demonstrated need.
 
-The long-term direction is for socket type objects to be typed through
-templates. The exact model is intentionally undecided.
+The consumer proof should validate that include paths, C++ standard
+requirements, and future transitive dependencies propagate through the target.
 
-Possible design pressure:
+## Execution Strategies
 
-- Protocol distinctions may become compile-time types, such as UDP vs TCP.
-- Address-family distinctions may also be represented in the type system, or
-  carried by runtime address values.
-- The template model should reduce invalid combinations without making basic
-  socket usage noisy.
-- The first API should stay small enough that the raw Linux socket behavior is
-  still easy to recognize.
+Future high-level use should be able to coordinate repeated operations and
+multiple sockets without every application rebuilding the same machinery.
 
-Open questions:
+Relevant design pressure includes:
 
-- Should socket templates be parameterized by protocol, address family, role, or
-  some smaller set of traits?
-- Should UDP and TCP have separate concrete socket types first, with templates
-  introduced only after the repeated shape is obvious?
-- How much compile-time typing is helpful before it starts increasing the
-  learning cost?
+- single-threaded event loops;
+- dedicated receive workers;
+- caller-provided executors or schedulers;
+- batching and backpressure;
+- cancellation, shutdown, and terminal results;
+- timers and retry coordination.
+
+Do not equate this feature with simply putting a thread inside every socket.
+Socket ownership, operation scheduling, and callback execution are separate
+decisions that need explicit contracts.
+
+## Storage And Data Adaptation
+
+Direct I/O should support caller-owned byte storage so high-throughput callers
+can control allocation and lifetime. Later options may include reusable buffers,
+fixed pools, rings, batches, and allocator-aware storage.
+
+Typed send/receive facilities should be opt-in adapters over the byte layer.
+They must define serialization, framing, ownership, and validation explicitly;
+the library should not reinterpret arbitrary object memory as a wire format.
+
+## Measurement Support
+
+Performance is a project requirement, not an unsupported claim. Benchmarks
+should make changes comparable by recording workload, payload size, build mode,
+machine context, repetitions, throughput, and relevant resource costs.
+
+Correctness and API work should not silently degrade throughput. A measured
+regression must be investigated and either corrected or deliberately accepted
+with its tradeoff documented.
+
+## Portability And Protocol Growth
+
+Likely later work includes:
+
+- IPv6 completion across all established seams;
+- a Windows backend behind the same public contracts;
+- TCP listeners and accepted connections;
+- connected UDP where it provides a concrete benefit;
+- portable error refinement informed by more than one protocol;
+- protocol-neutral batching and readiness integration.
+
+Compile-time typing remains an option where it prevents invalid combinations,
+but it should not make ordinary UDP or TCP use substantially noisier. Distinct
+resource types are the current baseline; templates should be introduced only
+when repeated implementations reveal a useful generic dimension.
